@@ -1,0 +1,136 @@
+# 银行系统微服务调用链领域知识 - 基于实际银行架构
+# 根 call_chain_layers 和 chain_weights 构建的因果关系
+
+causal-graph:
+  # 使用标准的PyRCA指标名称，但基于银行调用链层次定义因果关系
+  root-nodes: ["db", "conn_pool", "gen_size", "pod", "request", "jetty"]
+  leaf-nodes: ["apt"]
+  
+  # 禁止的因果关系 - 基于银行调用链架构的约束
+  forbids:
+    # 入口点(通过jetty指标)不会直接影响容器资源
+    - ["jetty", "pod"]
+    - ["jetty", "avg_cpu"]
+    # 数据库问题不会直接影响容器资源
+    - ["db", "pod"]
+    - ["db", "avg_cpu"]
+    # 缓存问题不会直接影响容器资源  
+    - ["conn_pool", "pod"]
+    - ["conn_pool", "avg_cpu"]
+  
+  # 强制的因果关系 - 基于银行调用链的影响链
+  requires:
+    # 入口点(jetty) → 网关(request) → 业务(gen_size/conn_pool) → 最终异常
+    - ["jetty", "request"]
+    - ["request", "gen_size"]
+    - ["request", "conn_pool"]
+    - ["gen_size", "apt"]
+    - ["conn_pool", "apt"]
+    
+    # 网关 → 容器资源 → 应用异常
+    - ["request", "pod"]
+    - ["pod", "avg_cpu"]
+    - ["avg_cpu", "apt"]
+    
+    # 业务 → 数据库 → 应用异常
+    - ["conn_pool", "db"]
+    - ["db", "apt"]
+    
+    # JVM内存管理 → 垃圾回收 → 应用异常
+    - ["gen_size", "gc"]
+    - ["gc", "apt"]
+    
+    # 容器资源 → 应用异常
+    - ["pod", "apt"]
+
+root-causes:
+  # 入口点层根因 - Apache负载均衡器 (权重: 0.5)
+  - name: "ROOT_jetty"
+    P(r=1): 0.45
+    metrics:
+    - name: "jetty"
+    description: "Apache负载均衡器问题，影响请求分发"
+    affected-components: ["apache01", "apache02"]
+    weight: 0.5
+    layer: "entry_point"
+    
+  # 网关层根因 - IG网关 (权重: 1.0 - 最高)
+  - name: "ROOT_request"
+    P(r=1): 0.55
+    metrics:
+    - name: "request"
+    description: "IG网关服务异常，包括请求处理失败、超时等"
+    affected-components: ["IG01", "IG02"]
+    weight: 1.0
+    layer: "gateway"
+    
+  # 业务层根因 - Tomcat业务逻辑 (权重: 0.9)
+  - name: "ROOT_gen_size"
+    P(r=1): 0.52
+    metrics:
+    - name: "gen_size"
+    description: "Tomcat业务逻辑处理失败，JVM堆内存问题"
+    affected-components: ["Tomcat01", "Tomcat02", "Tomcat03", "Tomcat04"]
+    weight: 0.9
+    layer: "business"
+    
+  # 业务层根因 - Tomcat连接池 (权重: 0.9)
+  - name: "ROOT_conn_pool"
+    P(r=1): 0.50
+    metrics:
+    - name: "conn_pool"
+    description: "Tomcat业务逻辑连接池问题，数据库连接耗尽"
+    affected-components: ["Tomcat01", "Tomcat02", "Tomcat03", "Tomcat04"]
+    weight: 0.9
+    layer: "business"
+    
+  # 数据库层根因 - MySQL (权重: 0.95)
+  - name: "ROOT_db"
+    P(r=1): 0.60
+    metrics:
+    - name: "db"
+    description: "MySQL数据库服务异常，包括连接数过多、慢查询、锁等待等"
+    affected-components: ["Mysql01", "Mysql02"]
+    weight: 0.95
+    layer: "database"
+    
+  # 容器层根因 - Docker (权重: 0.7)
+  - name: "ROOT_pod"
+    P(r=1): 0.48
+    metrics:
+    - name: "pod"
+    description: "Docker容器资源不足，包括CPU、内存、磁盘IO限制等"
+    affected-components: ["dockerA1", "dockerA2", "dockerB1", "dockerB2"]
+    weight: 0.7
+    layer: "container"
+
+# 银行调用链权重映射 (来自 call_chain_weights)
+chain-weights:
+  gateway: 1.0        # IG01, IG02 - request指标
+  database: 0.95      # Mysql01, Mysql02 - db指标
+  business: 0.9       # Tomcat01-04 - gen_size, conn_pool指标
+  governance: 0.8     # MG01, MG02 - 通过business层影响
+  container: 0.7      # dockerA1-A2, dockerB1-B2 - pod指标
+  cache: 0.6          # Redis01, Redis02 - 通过conn_pool影响
+  entry_point: 0.5    # apache01, apache02 - jetty指标
+
+# 组件到调用链层次的映射 (来自 call_chain_layers)
+component-mapping:
+  apache01: "entry_point"    # jetty指标
+  apache02: "entry_point"    # jetty指标
+  IG01: "gateway"            # request指标
+  IG02: "gateway"            # request指标
+  Tomcat01: "business"       # gen_size, conn_pool指标
+  Tomcat02: "business"       # gen_size, conn_pool指标
+  Tomcat03: "business"       # gen_size, conn_pool指标
+  Tomcat04: "business"       # gen_size, conn_pool指标
+  MG01: "governance"         # 通过business层影响
+  MG02: "governance"         # 通过business层影响
+  dockerA1: "container"      # pod指标
+  dockerA2: "container"      # pod指标
+  dockerB1: "container"      # pod指标
+  dockerB2: "container"      # pod指标
+  Mysql01: "database"        # db指标
+  Mysql02: "database"        # db指标
+  Redis01: "cache"           # 通过conn_pool影响
+  Redis02: "cache"           # 通过conn_pool影响

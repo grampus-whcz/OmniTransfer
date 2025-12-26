@@ -1,0 +1,83 @@
+{
+  "fault_exact_time_stamp": "1647743634",
+  "fault_exact_time": "2022-03-20 10:33:54+08:00",
+  "fault_slot_start": "2022-03-20 10:30:00+08:00",
+  "csv_row_number": 5,
+  "fault_date": "2022-03-20",
+  "normal_date": "2022-03-21",
+  "log_pods": [
+    "adservice-0",
+    "adservice-1",
+    "adservice-2",
+    "adservice2-0",
+    "cartservice-0",
+    "cartservice-1",
+    "cartservice-2",
+    "cartservice2-0",
+    "checkoutservice-0",
+    "checkoutservice-1",
+    "checkoutservice-2",
+    "checkoutservice2-0",
+    "currencyservice-0",
+    "currencyservice-1",
+    "currencyservice-2",
+    "currencyservice2-0",
+    "emailservice-0",
+    "emailservice-1",
+    "emailservice-2",
+    "emailservice2-0",
+    "frontend-0",
+    "frontend-1",
+    "frontend-2",
+    "frontend2-0",
+    "paymentservice-0",
+    "paymentservice-1",
+    "paymentservice-2",
+    "paymentservice2-0",
+    "productcatalogservice-0",
+    "productcatalogservice-1",
+    "productcatalogservice-2",
+    "productcatalogservice2-0",
+    "recommendationservice-0",
+    "recommendationservice-1",
+    "recommendationservice-2",
+    "recommendationservice2-0",
+    "shippingservice-0",
+    "shippingservice-1",
+    "shippingservice-2",
+    "shippingservice2-0"
+  ],
+  "log_pod_count": 40,
+  "log_bucket_sec": 60,
+  "log_online_shape_service": [
+    40,
+    30,
+    91
+  ],
+  "log_offline_shape_service": [
+    40,
+    30,
+    91
+  ],
+  "log_online_shape_istio_patterns": [
+    40,
+    30,
+    91
+  ],
+  "log_offline_shape_istio_patterns": [
+    40,
+    30,
+    91
+  ],
+  "log_online_shape_istio_words": [
+    40,
+    30,
+    162
+  ],
+  "log_offline_shape_istio_words": [
+    40,
+    30,
+    162
+  ],
+  "note": "Each log feature array has shape (num_pods, 30, num_features). Pods order is consistent across all files."
+}

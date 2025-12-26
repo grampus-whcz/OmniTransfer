@@ -1,0 +1,11 @@
+# 2.Bank_cluster_window_analyze_anomalies_old.py
+Bank_cluster_window_analyze_anomalies.py的老版本，只根据npy做聚类
+
+# 3.Bank_rca_by_cluster.py
+针对上面聚类后的report，采用PyRCA进行初步根因分析
+
+# Bank_cluster_window_analyze_anomalies.py
+将2.Bank_cluster_window_analyze_anomalies_old.py和3.Bank_rca_by_cluster.py合并，根据npy做聚类，并采用PyRCA进行初步根因分析
+
+# 4.run_all_analyses
+对1204中已生成的npy进行聚类和PyRCA根因初步分析

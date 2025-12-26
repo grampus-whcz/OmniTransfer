@@ -1,0 +1,36 @@
+{
+  "entity_type": "entity_B",
+  "level": "pod",
+  "reason": "CPU fault",
+  "component": "docker_003",
+  "fault_date": "2020-04-11",
+  "normal_date": "2020-04-20",
+  "fault_start_time": "2020-04-11 00:00:00",
+  "fault_end_time": "2020-04-11 00:30:00",
+  "normal_start_time": "2020-04-20 00:00:00",
+  "normal_end_time": "2020-04-20 00:30:00",
+  "bucket_sec": 60,
+  "duration_minutes": 30,
+  "online_shape": [
+    1,
+    30,
+    4
+  ],
+  "offline_shape": [
+    1,
+    30,
+    4
+  ],
+  "common_entity_count": 1,
+  "sample_entities": [
+    "osb_001"
+  ],
+  "features_sample": [
+    "avg_time",
+    "num",
+    "succee_num",
+    "succee_rate"
+  ],
+  "feature_count": 4,
+  "note": "Data aligned by common entities across fault and normal days."
+}

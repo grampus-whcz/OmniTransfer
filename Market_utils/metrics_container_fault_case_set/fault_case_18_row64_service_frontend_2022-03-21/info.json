@@ -1,0 +1,30 @@
+{
+  "fault_pattern": "service | container CPU load",
+  "level": "service",
+  "component": "frontend",
+  "fault_exact_time_stamp": "1647845941",
+  "fault_exact_time": "2022-03-21 14:59:01+08:00",
+  "fault_slot_start": "2022-03-21 14:30:00+08:00",
+  "csv_row_number": 64,
+  "fault_date": "2022-03-21",
+  "normal_date": "2022-03-20",
+  "normal_interval": "2022-03-20 23:30:00 -> 2022-03-21 00:00:00",
+  "online_shape": [
+    73,
+    30,
+    64
+  ],
+  "offline_shape": [
+    73,
+    30,
+    64
+  ],
+  "entity_list_sample": [
+    "node-5.adservice-0",
+    "node-5.adservice-1",
+    "node-5.adservice-2",
+    "node-5.cartservice-0",
+    "node-5.cartservice-1"
+  ],
+  "kpi_count": 64
+}

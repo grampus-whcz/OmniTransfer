@@ -1,0 +1,30 @@
+{
+  "fault_pattern": "pod | container packet loss",
+  "level": "pod",
+  "component": "frontend-2",
+  "fault_exact_time_stamp": "1647841753",
+  "fault_exact_time": "2022-03-21 13:49:13+08:00",
+  "fault_slot_start": "2022-03-21 13:30:00+08:00",
+  "csv_row_number": 61,
+  "fault_date": "2022-03-21",
+  "normal_date": "2022-03-20",
+  "normal_interval": "2022-03-20 13:30:00 -> 2022-03-20 14:00:00",
+  "online_shape": [
+    183,
+    30,
+    129
+  ],
+  "offline_shape": [
+    183,
+    30,
+    129
+  ],
+  "entity_list_sample": [
+    "adservice-0.destination.frontend.adservice",
+    "adservice-0.destination.unknown.adservice",
+    "adservice-0.source.adservice.basic-tidb",
+    "adservice-0.source.adservice.jaeger-collector",
+    "adservice-1.destination.frontend.adservice"
+  ],
+  "kpi_count": 129
+}
