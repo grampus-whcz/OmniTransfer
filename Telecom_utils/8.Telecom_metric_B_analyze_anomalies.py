@@ -87,7 +87,7 @@ def analyze_entityB_anomalies(
 
     report_output_dir = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{pred_dir_name}"
     os.makedirs(report_output_dir, exist_ok=True)
-    report_file_path = os.path.join(report_output_dir, f"Telecom_entityB_anomaly_report_{anomaly_report}.txt")
+    report_file_path = os.path.join(report_output_dir, f"Telecom_metric_B_anomaly_report_{anomaly_report}.txt")
 
     report_lines = []
     report_lines.append("\n📝 Telecom Entity-B (app_service) Anomaly Report (Beijing Time = UTC+8):")

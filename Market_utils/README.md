@@ -1,0 +1,5 @@
+# 3.get_Market_no_fault_timezone_new.py
+寻找不故障时间域做为offline data, 生成cloudbed-1_record_with_normal_intervals_new.csv
+
+# 3.get_Market_no_fault_timezone_new_1.py
+直接使用相邻日期对应时间段为offline data, 生成cloudbed-1_record_with_normal_intervals_new_new.csv

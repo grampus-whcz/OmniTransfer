@@ -1,34 +1,36 @@
 #！/bin/bash
-# nohup bash run_pipline.sh >> run_pipline_log_6.log 2>&1 &
+# nohup bash run_pipline.sh >> run_pipline_log_7.log 2>&1 &
 
-python 9.run_pipline_Market_metric.py \
-  --date_offline 2022_03_20 \
-  --date_offline_start_ts 1647734400 \
-  --date_offline_end_ts 1647739800 \
-  --date_online 2022_03_20 \
-  --date_online_start_ts 1647739800 \
-  --date_online_end_ts 1647741600 \
-  --cloudbed cloudbed-1 \
-  --method TranAD \
-  --output_folder_name 1215 \
-  --output_suffix 1200_1230 \
-  --data_dir data2 \
-  --metric_type node
+# python 9.run_pipline_Market_metric.py \
+#   --date_offline 2022_03_20 \
+#   --date_offline_start_ts 1647734400 \
+#   --date_offline_end_ts 1647739800 \
+#   --date_online 2022_03_20 \
+#   --date_online_start_ts 1647739800 \
+#   --date_online_end_ts 1647741600 \
+#   --cloudbed cloudbed-1 \
+#   --method TranAD \
+#   --output_folder_name 1215 \
+#   --output_suffix 1200_1230 \
+#   --data_dir data2 \
+#   --metric_type node
 
-# 注意LLM调用工具时，参数传递不依从问题。时间戳和日期根本对不上
-/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py \
---date_offline 2022_03_21 \
---date_online 2022_03_20 \
---date_offline_start_ts 1647813600 \
---date_offline_end_ts 1647817200 \
---date_online_start_ts 1647738000 \
---date_online_end_ts 1647741600 \
---cloudbed cloudbed-1 \
---method TranAD \
---output_folder_name 1215 \
---output_suffix 0930_1000 \
---metric_type node \
---data_dir data2
+# # 注意LLM调用工具时，参数传递不依从问题。时间戳和日期根本对不上
+# /root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py \
+# --date_offline 2022_03_21 \
+# --date_online 2022_03_20 \
+# --date_offline_start_ts 1647813600 \
+# --date_offline_end_ts 1647817200 \
+# --date_online_start_ts 1647738000 \
+# --date_online_end_ts 1647741600 \
+# --cloudbed cloudbed-1 \
+# --method TranAD \
+# --output_folder_name 1215 \
+# --output_suffix 0930_1000 \
+# --metric_type node \
+# --data_dir data2
+
+python -u 16.run_all_commands.py
 
 
 

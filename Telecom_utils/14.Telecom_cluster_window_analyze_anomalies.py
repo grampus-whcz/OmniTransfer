@@ -13,6 +13,7 @@ def ts_to_beijing_str(ts):
     dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(BEIJING_TZ)
     return dt.strftime("%Y-%m-%d %H:%M:%S") + " CST"
 
+# load 所有异常
 def load_anomalies_from_window(base_dir, date_str, window_str):
     """加载 Telecom 的三类异常文件（metric_A, metric_B, trace），并去重"""
     anomalies = []
@@ -77,6 +78,98 @@ def load_anomalies_from_window(base_dir, date_str, window_str):
 
     unique_anomalies.sort(key=lambda x: x['ts'])
     print(f"🧹 After deduplication: {len(unique_anomalies)} unique anomalies (was {len(anomalies)})")
+    return unique_anomalies
+
+import os
+import numpy as np
+from collections import defaultdict
+
+# 只 load metric_A中3个以上的异常
+def load_anomalies_from_window_new(base_dir, date_str, window_str):
+    """加载 Telecom 的三类异常文件（metric_A, metric_B, trace），并去重；
+       对 metric_A 只保留 (entity, attribute) 出现 >=3 次的记录。
+    """
+    raw_anomalies = []  # 存储所有原始加载的异常（含重复）
+    file_specs = [
+        ("metric_A", f"Telecom_metric_A_anomalies_{date_str}_{window_str}.npy"),
+        ("metric_B", f"Telecom_metric_B_anomalies_{date_str}_{window_str}.npy"),
+        ("trace", f"Telecom_trace_anomalies_{date_str}_{window_str}.npy")
+    ]
+
+    for typ, filename in file_specs:
+        filepath = os.path.join(base_dir, filename)
+        if not os.path.exists(filepath):
+            print(f"⚠️  File not found: {filepath}")
+            continue
+
+        try:
+            data = np.load(filepath, allow_pickle=True)
+            print(f"✅ Loaded {len(data)} anomalies from {filename}")
+        except Exception as e:
+            print(f"❌ Error loading {filename}: {e}")
+            continue
+
+        for item in data:
+            if typ == "metric_A":
+                entity, attr, ts = item
+                raw_anomalies.append({
+                    'ts': int(ts),
+                    'type': 'metric_A',
+                    'entity': str(entity),
+                    'attribute': str(attr),
+                    'raw': ''
+                })
+            elif typ == "metric_B":
+                entity, attr, ts = item
+                raw_anomalies.append({
+                    'ts': int(ts),
+                    'type': 'metric_B',
+                    'entity': str(entity),
+                    'attribute': str(attr),
+                    'raw': ''
+                })
+            elif typ == "trace":
+                edge, attr, ts = item
+                raw_anomalies.append({
+                    'ts': int(ts),
+                    'type': 'trace',
+                    'entity': str(edge),
+                    'attribute': str(attr),
+                    'raw': ''
+                })
+
+    # 第一步：对 metric_A 按 (entity, attribute) 分组计数
+    metric_a_groups = defaultdict(list)
+    other_anomalies = []
+
+    for a in raw_anomalies:
+        if a['type'] == 'metric_A':
+            key = (a['entity'], a['attribute'])
+            metric_a_groups[key].append(a)
+        else:
+            other_anomalies.append(a)
+
+    # 第二步：只保留出现 >=3 次的 metric_A 异常
+    filtered_metric_a = []
+    for key, items in metric_a_groups.items():
+        if len(items) >= 4:
+            filtered_metric_a.extend(items)
+
+    # 第三步：合并 filtered_metric_a + 其他类型（metric_B, trace）
+    anomalies = filtered_metric_a + other_anomalies
+
+    # 🔥 去重：避免同一 (type, entity, attr, ts) 重复
+    seen = set()
+    unique_anomalies = []
+    for a in anomalies:
+        key = (a['type'], a['entity'], a['attribute'], a['ts'])
+        if key not in seen:
+            seen.add(key)
+            unique_anomalies.append(a)
+
+    unique_anomalies.sort(key=lambda x: x['ts'])
+    print(f"🧹 After deduplication and metric_A filtering: {len(unique_anomalies)} unique anomalies "
+          f"(original total: {len(raw_anomalies)})")
     return unique_anomalies
 
 def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2):
@@ -177,7 +270,7 @@ if __name__ == "__main__":
     BASE_DIR = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{args.output_folder_name}"
 
     print(f"📁 Loading anomalies for date={args.date_online}, window={args.output_suffix}")
-    anomalies = load_anomalies_from_window(BASE_DIR, args.date_online, args.output_suffix)
+    anomalies = load_anomalies_from_window_new(BASE_DIR, args.date_online, args.output_suffix)
     
     output_file = f"{BASE_DIR}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}.txt"
 

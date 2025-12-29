@@ -1,0 +1,35 @@
+import subprocess
+import sys
+
+# 定义所有要执行的命令（列表形式）
+commands = [
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type node --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type service --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type container --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type mesh --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type runtime --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/12.run_pipline_Market_trace.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/14.run_pipline_Market_log.py --date_offline 2022_03_21 --date_online 2022_03_20 --date_offline_start_ts 1647792000 --date_offline_end_ts 1647878400 --date_online_start_ts 1647705600 --date_online_end_ts 1647792000 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --data_dir data2",
+
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type node --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type service --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type container --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type mesh --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/9.run_pipline_Market_metric.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --metric_type runtime --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/12.run_pipline_Market_trace.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --data_dir data2",
+    "/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/Market_utils/14.run_pipline_Market_log.py --date_offline 2022_03_20 --date_online 2022_03_21 --date_offline_start_ts 1647705600 --date_offline_end_ts 1647792000 --date_online_start_ts 1647792000 --date_online_end_ts 1647878400 --cloudbed cloudbed-2 --method TranAD --output_folder_name 1215 --output_suffix 0000_2400 --data_dir data2"
+]
+
+def run_commands(commands):
+    for i, cmd in enumerate(commands, start=1):
+        print(f"\n[+] Running command {i}/{len(commands)}:\n{cmd}\n")
+        result = subprocess.run(cmd, shell=True)
+        if result.returncode != 0:
+            print(f"[-] Command {i} failed with return code {result.returncode}")
+            # 可选择是否继续：取消下一行注释则遇到错误就退出
+            # sys.exit(1)
+        else:
+            print(f"[+] Command {i} succeeded.\n")
+
+if __name__ == "__main__":
+    run_commands(commands)

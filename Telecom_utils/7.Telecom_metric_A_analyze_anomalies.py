@@ -93,7 +93,7 @@ def analyze_anomalies_in_time_range(
     # Output report directory
     report_output_dir = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{pred_dir_name}"
     os.makedirs(report_output_dir, exist_ok=True)
-    report_file_path = os.path.join(report_output_dir, f"Telecom_metric_cmdb_anomaly_report_{anomaly_report}.txt")
+    report_file_path = os.path.join(report_output_dir, f"Telecom_metric_A_anomaly_report_{anomaly_report}.txt")
 
     # Build report lines
     report_lines = []
