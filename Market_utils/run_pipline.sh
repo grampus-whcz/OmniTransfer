@@ -1,5 +1,5 @@
 #！/bin/bash
-# nohup bash run_pipline.sh >> run_pipline_log_7.log 2>&1 &
+# nohup bash run_pipline.sh >> run_pipline_log_8.log 2>&1 &
 
 # python 9.run_pipline_Market_metric.py \
 #   --date_offline 2022_03_20 \

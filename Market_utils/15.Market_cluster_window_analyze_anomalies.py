@@ -355,18 +355,360 @@ def load_anomalies_from_window_big(base_dir, date_str, window_str):
           f"(from {len(filtered_anomalies)} filtered anomalies)")
     return unique_anomalies
 
+import os
+import numpy as np
+from datetime import datetime
+from collections import defaultdict
+
+# 假设 BEIJING_TZ 已定义，例如：
+# from zoneinfo import ZoneInfo  # Python 3.9+
+# BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+# 如果你用旧版本，可用 pytz:
+# import pytz
+# BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+
+def load_anomalies_from_window_big_1(base_dir, date_str, window_str):
+    """
+    从全量 24 小时异常文件（_0000_2400.npy）中加载数据，
+    并根据 window_str 指定的时间段进行过滤，
+    再筛选出同一 (entity, attribute) 在该窗口内出现 >=4 次的异常。
+    
+    特别处理 metric_mesh 和 log 类型：
+      - 按 entity 分组
+      - 在每个 entity 内，仅保留异常次数最多的前 3 个 (entity, attribute) 组合
+      - 保留这些组合的所有记录（不截断）
+    """
+    anomalies = []
+
+    # === 解析 window_str 为目标时间窗口（格式: HHMM_HHMM，例如 0930_1000）===
+    try:
+        parts = window_str.split('_')
+        if len(parts) != 2:
+            raise ValueError(f"Expected format HHMM_HHMM, got '{window_str}'")
+
+        start_hm, end_hm = parts[0], parts[1]
+
+        if not (len(start_hm) == 4 and start_hm.isdigit() and len(end_hm) == 4 and end_hm.isdigit()):
+            raise ValueError(f"Time parts must be 4-digit numbers (HHMM), got '{start_hm}' and '{end_hm}'")
+
+        date_part = datetime.strptime(date_str, "%Y_%m_%d")
+        start_hour, start_min = int(start_hm[:2]), int(start_hm[2:])
+        end_hour, end_min = int(end_hm[:2]), int(end_hm[2:])
+
+        start_dt = date_part.replace(hour=start_hour, minute=start_min, second=0, microsecond=0, tzinfo=BEIJING_TZ)
+        end_dt = date_part.replace(hour=end_hour, minute=end_min, second=0, microsecond=0, tzinfo=BEIJING_TZ)
+
+        start_ts = int(start_dt.timestamp())
+        end_ts = int(end_dt.timestamp())  # [start_ts, end_ts)
+    except Exception as e:
+        print(f"⚠️ Failed to parse window '{window_str}': {e}. Skipping time filtering.")
+        start_ts, end_ts = None, None
+
+    # ❗ 关键：始终加载 _0000_2400.npy 的全量文件
+    full_window = "0000_2400"
+    file_specs = [
+        ("metric_service", f"Market_metric_service_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_runtime", f"Market_metric_runtime_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_container", f"Market_metric_container_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_mesh", f"Market_metric_mesh_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_node", f"Market_metric_node_anomalies_{date_str}_{full_window}.npy"),
+        ("trace", f"Market_trace_anomalies_{date_str}_{full_window}.npy"),
+        ("log", f"Market_log_anomalies_{date_str}_{full_window}.npy")
+    ]
+
+    for typ, filename in file_specs:
+        filepath = os.path.join(base_dir, filename)
+        if not os.path.exists(filepath):
+            print(f"⚠️  File not found: {filepath}")
+            continue
+
+        try:
+            data = np.load(filepath, allow_pickle=True)
+            print(f"✅ Loaded {len(data)} anomalies from {filename}")
+        except Exception as e:
+            print(f"❌ Error loading {filename}: {e}")
+            continue
+
+        for item in data:
+            if typ == "log":
+                pod, pattern_id, template, ts = item
+                ts = int(ts)
+                entity_key = str(pod)
+                # attr_key = f"PatternID_{pattern_id}"
+                attr_key = template
+            else:
+                entity, attr, ts = item
+                ts = int(ts)
+                entity_key = str(entity)
+                attr_key = str(attr)
+
+            anomalies.append({
+                'ts': ts,
+                'type': typ,
+                'entity': entity_key,
+                'attribute': attr_key,
+                'raw': template if typ == "log" else ''
+            })
+
+    print(f"📊 Total anomalies loaded (before window filter): {len(anomalies)}")
+
+    # === 时间范围过滤：只保留 window_str 指定区间内的异常 ===
+    if start_ts is not None and end_ts is not None:
+        anomalies = [a for a in anomalies if start_ts <= a['ts'] < end_ts]
+        print(f"🕒 After time window [{window_str}] filtering: {len(anomalies)} anomalies")
+
+    # --- 新逻辑：对 metric_mesh 和 log，按 entity 保留每个 entity 下 top-k 的 (entity, attribute) 组合 ---
+    filtered_anomalies = []
+    all_types = set(a['type'] for a in anomalies)
+
+    for typ in all_types:
+        type_anomalies = [a for a in anomalies if a['type'] == typ]
+        if typ in ['metric_service', 'metric_runtime', 'metric_container', 'metric_mesh', 'metric_node', 'trace', 'log']:
+            # 按 entity 分组
+            entity_groups = defaultdict(list)
+            for a in type_anomalies:
+                entity_groups[a['entity']].append(a)
+
+            # 对每个 entity，选出其下频次最高的前k个 (entity, attribute) 组合
+            for entity, items in entity_groups.items():
+                attr_counter = defaultdict(int)
+                attr_to_items = defaultdict(list)
+                for item in items:
+                    key = (item['entity'], item['attribute'])
+                    attr_counter[key] += 1
+                    attr_to_items[key].append(item)
+
+                # 取 top-k 组合（按频次降序）
+                topk_keys = sorted(attr_counter.items(), key=lambda x: x[1], reverse=True)[:1]
+                topk_keys = [k for k, _ in topk_keys]
+
+                # 保留这些组合的所有记录
+                for key in topk_keys:
+                    filtered_anomalies.extend(attr_to_items[key])
+        else:
+            filtered_anomalies.extend(type_anomalies)
+
+    anomalies = filtered_anomalies
+    print(f"🔝 After top-k per entity for metric, trace, and log: {len(anomalies)} anomalies")
+
+    # --- 筛选：仅保留 (entity, attribute) 在该窗口内出现 >=4 次的记录 ---
+    entity_attr_counts = defaultdict(int)
+    for a in anomalies:
+        key = (a['entity'], a['attribute'])
+        entity_attr_counts[key] += 1
+
+    frequent_keys = {k for k, v in entity_attr_counts.items() if v >= 4}
+    print(f"🔍 Found {len(frequent_keys)} (entity, attribute) pairs with >= 4 anomalies in the window.")
+
+    filtered_anomalies = [a for a in anomalies if (a['entity'], a['attribute']) in frequent_keys]
+    print(f"📋 After filtering for frequent (entity, attribute): {len(filtered_anomalies)} anomalies")
+
+    # --- 去重（按 type + entity + attribute + ts）---
+    seen = set()
+    unique_anomalies = []
+    for a in filtered_anomalies:
+        key = (a['type'], a['entity'], a['attribute'], a['ts'])
+        if key not in seen:
+            seen.add(key)
+            unique_anomalies.append(a)
+
+    unique_anomalies.sort(key=lambda x: x['ts'])
+    print(f"🧹 After deduplication: {len(unique_anomalies)} unique anomalies "
+          f"(from {len(filtered_anomalies)} filtered anomalies)")
+    return unique_anomalies
+
+import os
+import numpy as np
+from datetime import datetime
+from collections import defaultdict
+
+# 确保 BEIJING_TZ 已定义（根据你的环境选择一种方式）
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+    BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+except ImportError:
+    import pytz  # 需要 pip install pytz（适用于旧版本 Python）
+    BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+
+
+def load_anomalies_from_window_big_new(base_dir, date_str, window_str):
+    """
+    从全量 24 小时异常文件（_0000_2400.npy）中加载数据，
+    并根据 window_str 指定的时间段进行过滤。
+
+    处理逻辑：
+      - 所有类型：先按时间窗口过滤
+      - 所有类型：保留 (entity, attribute) 出现 >=4 次的组合
+      - 特别地，对 metric_mesh 和 log：
+          * 在满足 >=4 的组合中，跨 entity 选择频次最高的最多 3 个组合
+          * 要求这 3 个组合来自 3 个不同的 entity（每个 entity 最多贡献 1 个）. 最新策略：只选一个
+          * 保留选中组合的所有原始记录
+      - 其他类型：保留所有 >=4 的组合（无 top-k 限制）
+    """
+    anomalies = []
+
+    # === 解析 window_str 为目标时间窗口（格式: HHMM_HHMM，例如 0930_1000）===
+    try:
+        parts = window_str.split('_')
+        if len(parts) != 2:
+            raise ValueError(f"Expected format HHMM_HHMM, got '{window_str}'")
+
+        start_hm, end_hm = parts[0], parts[1]
+        if not (len(start_hm) == 4 and start_hm.isdigit() and len(end_hm) == 4 and end_hm.isdigit()):
+            raise ValueError(f"Time parts must be 4-digit numbers (HHMM), got '{start_hm}' and '{end_hm}'")
+
+        date_part = datetime.strptime(date_str, "%Y_%m_%d")
+        start_hour, start_min = int(start_hm[:2]), int(start_hm[2:])
+        end_hour, end_min = int(end_hm[:2]), int(end_hm[2:])
+
+        start_dt = date_part.replace(hour=start_hour, minute=start_min, second=0, microsecond=0, tzinfo=BEIJING_TZ)
+        end_dt = date_part.replace(hour=end_hour, minute=end_min, second=0, microsecond=0, tzinfo=BEIJING_TZ)
+
+        start_ts = int(start_dt.timestamp())
+        end_ts = int(end_dt.timestamp())  # [start_ts, end_ts)
+    except Exception as e:
+        print(f"⚠️ Failed to parse window '{window_str}': {e}. Skipping time filtering.")
+        start_ts, end_ts = None, None
+
+    # ❗ 关键：始终加载 _0000_2400.npy 的全量文件
+    full_window = "0000_2400"
+    file_specs = [
+        ("metric_service", f"Market_metric_service_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_runtime", f"Market_metric_runtime_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_container", f"Market_metric_container_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_mesh", f"Market_metric_mesh_anomalies_{date_str}_{full_window}.npy"),
+        ("metric_node", f"Market_metric_node_anomalies_{date_str}_{full_window}.npy"),
+        ("trace", f"Market_trace_anomalies_{date_str}_{full_window}.npy"),
+        ("log", f"Market_log_anomalies_{date_str}_{full_window}.npy")
+    ]
+
+    for typ, filename in file_specs:
+        filepath = os.path.join(base_dir, filename)
+        if not os.path.exists(filepath):
+            print(f"⚠️  File not found: {filepath}")
+            continue
+
+        try:
+            data = np.load(filepath, allow_pickle=True)
+            print(f"✅ Loaded {len(data)} anomalies from {filename}")
+        except Exception as e:
+            print(f"❌ Error loading {filename}: {e}")
+            continue
+
+        for item in data:
+            if typ == "log":
+                pod, pattern_id, template, ts = item
+                ts = int(ts)
+                entity_key = str(pod)
+                attr_key = template  # 使用 template 作为 attribute
+            else:
+                entity, attr, ts = item
+                ts = int(ts)
+                entity_key = str(entity)
+                attr_key = str(attr)
+
+            anomalies.append({
+                'ts': ts,
+                'type': typ,
+                'entity': entity_key,
+                'attribute': attr_key,
+                'raw': template if typ == "log" else ''
+            })
+
+    print(f"📊 Total anomalies loaded (before window filter): {len(anomalies)}")
+
+    # === 时间范围过滤：只保留 window_str 指定区间内的异常 ===
+    if start_ts is not None and end_ts is not None:
+        anomalies = [a for a in anomalies if start_ts <= a['ts'] < end_ts]
+        print(f"🕒 After time window [{window_str}] filtering: {len(anomalies)} anomalies")
+
+    # === 按类型分组处理 ===
+    final_anomalies = []
+    all_types = set(a['type'] for a in anomalies)
+
+    for typ in all_types:
+        type_anomalies = [a for a in anomalies if a['type'] == typ]
+
+        if typ in ['metric_service', 'metric_runtime', 'metric_container', 'metric_mesh', 'metric_node', 'trace', 'log']:
+            # 构建 (entity, attribute) -> list of anomalies 映射，并统计频次
+            counter = defaultdict(int)
+            group_map = defaultdict(list)
+            for a in type_anomalies:
+                key = (a['entity'], a['attribute'])
+                counter[key] += 1
+                group_map[key].append(a)
+
+            # 只考虑频次 >=4 的组合
+            frequent_items = [(key, count) for key, count in counter.items() if count >= 4]
+            # 按频次降序排序（频次相同则顺序不确定，但不影响 correctness）
+            frequent_items.sort(key=lambda x: x[1], reverse=True)
+
+            # 贪心选择：每个 entity 最多选 1 个，最多选 1 个
+            selected_keys = set()
+            seen_entities = set()
+            for (entity, attr), freq in frequent_items:
+                if len(selected_keys) >= 1:
+                    break
+                if entity not in seen_entities:
+                    selected_keys.add((entity, attr))
+                    seen_entities.add(entity)
+
+            # 收集选中组合的所有原始记录
+            for key in selected_keys:
+                final_anomalies.extend(group_map[key])
+
+            print(f"🔝 For {typ}: selected {len(selected_keys)} (entity, attribute) groups "
+                  f"from {len(seen_entities)} distinct entities (top by frequency, entity-unique)")
+
+        else:
+            # 其他类型：仅保留频次 >=4 的组合，不做 top-k 限制
+            counter = defaultdict(int)
+            for a in type_anomalies:
+                key = (a['entity'], a['attribute'])
+                counter[key] += 1
+
+            frequent_keys = {k for k, v in counter.items() if v >= 4}
+            filtered = [a for a in type_anomalies if (a['entity'], a['attribute']) in frequent_keys]
+            final_anomalies.extend(filtered)
+            print(f"📈 For {typ}: kept {len(frequent_keys)} (entity, attribute) groups (all >=4)")
+
+    # === 去重（按 type + entity + attribute + ts）===
+    seen = set()
+    unique_anomalies = []
+    for a in final_anomalies:
+        key = (a['type'], a['entity'], a['attribute'], a['ts'])
+        if key not in seen:
+            seen.add(key)
+            unique_anomalies.append(a)
+
+    unique_anomalies.sort(key=lambda x: x['ts'])
+    print(f"🧹 Final unique anomalies: {len(unique_anomalies)}")
+    return unique_anomalies
+
+import re
+
 def extract_keywords(template):
     """从 log 模板中提取关键故障词（与 Bank 一致）"""
+    if template is None:
+        return []
+    if not isinstance(template, str):
+        return []
+    
     keywords = set()
     t_low = template.lower()
-    if any(kw in t_low for kw in ['out of memory', 'oom', 'java.lang.outofmemoryerror']):
-        keywords.add("OOM")
-    if 'gc' in t_low and ('allocation failure' in t_low or 'full gc' in t_low):
-        keywords.add("GC")
-    if 'error' in t_low or 'exception' in t_low or 'fail' in t_low:
-        keywords.add("Error/Failure")
-    if 'timeout' in t_low:
-        keywords.add("Timeout")
+    
+    # 定义关键字及其对应的正则模式（使用单词边界）
+    patterns = {
+        "OOM": r'\b(out of memory|oom|java\.lang\.outofmemoryerror)\b',
+        "GC": r'\b(gc\s*(overhead\s*limit|allocation\s*failure|full\s*gc))\b',
+        "Error/Failure": r'\b(error|exception)\b',
+        "Timeout": r'\btimeout\b'
+    }
+    
+    for keyword, pattern in patterns.items():
+        if re.search(pattern, t_low):
+            keywords.add(keyword)
+    
     return sorted(keywords)
 
 def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2):
@@ -556,7 +898,7 @@ if __name__ == "__main__":
     BASE_DIR = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{args.output_folder_name}"
     print(f"📁 Loading Market anomalies for date={args.date_online}, window={args.output_suffix}")
 
-    anomalies = load_anomalies_from_window_big(BASE_DIR, args.date_online, args.output_suffix)
+    anomalies = load_anomalies_from_window_big_new(BASE_DIR, args.date_online, args.output_suffix)
     output_file = f"{BASE_DIR}/Market_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}.txt"
 
     print(f"🎯 Total anomalies loaded: {len(anomalies)}")
