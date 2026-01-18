@@ -67,3 +67,13 @@ python Bank_cluster_window_analyze_anomalies.py \
 --output_folder_name 1117
 ```
 
+# 7.get_representative_NO.py 得到代表性故障的在groudtruth中对应的编号
+结果为：
+# Bank    
+# [51, 48, 112, 71, 88, 70, 68, 72, 86, 47, 45, 65, 53, 52, 57, 54, 62, 60, 133, 0, 1, 2, 107, 8, 3, 13, 16, 9, 12, 6]
+
+# Market cloudbed-1
+# [0, 2, 4, 5, 6, 7, 8, 9, 12, 13, 14, 16, 20, 21, 23, 27, 29, 30, 31, 33, 49, 56]
+
+# Telecom
+# [2, 5, 8, 12, 17]

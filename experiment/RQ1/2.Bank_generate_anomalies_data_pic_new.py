@@ -171,7 +171,12 @@ for autotext in autotexts:
 
 # === 时间分布折线图（放在下方）===
 time_distribution_plot = time_distribution.reset_index()
-time_distribution_plot["minute_str"] = time_distribution_plot["minute"].dt.strftime('%H:%M')
+# time_distribution_plot["minute_str"] = time_distribution_plot["minute"].dt.strftime('%H:%M')
+import pandas as pd
+
+# 直接给时间列加上8小时，再格式化
+time_distribution_plot["minute_str"] = (time_distribution_plot["minute"] + pd.Timedelta(hours=8)).dt.strftime('%H:%M')
+
 x = list(range(len(time_distribution_plot)))
 
 for i, col in enumerate(time_distribution.columns):
