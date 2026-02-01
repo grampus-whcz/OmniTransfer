@@ -1,5 +1,5 @@
 #！/bin/bash
-# nohup bash run_pipline.sh >> run_pipline_log1.log 2>&1 &
+# nohup bash run_pipline.sh >> run_pipline_log2.log 2>&1 &
 
 # echo "Bank_metric_container"
 # python run_pipline_Bank_metric_container.py \
@@ -41,4 +41,12 @@
 #   --output_folder_name 1116 \
 #   --output_suffix 14_to_15
 
-python -u 4.run_all_analyses.py
+# python -u 4.run_all_analyses.py
+
+
+python Bank_cluster_window_analyze_anomalies_2.1.py \
+  --date_online 2021_03_04 \
+  --eps 60 \
+  --min_samples 3 \
+  --output_folder_name 1204 \
+  --output_suffix 0230_0300

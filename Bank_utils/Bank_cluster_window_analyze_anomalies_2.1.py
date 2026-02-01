@@ -6,25 +6,28 @@ from datetime import datetime, timezone, timedelta
 import argparse
 import sys
 import re
-
-# === 新增：RCA 分析器（来自第二个脚本）===
-# 确保 PyRCA 路径可用
+import subprocess
 from pathlib import Path
-import sys
 
+# === Added: RCA Analyzer (from the second script) ===
+# Ensure PyRCA path is available
 script_dir = Path(__file__).resolve().parent
-project_root = script_dir.parent  # 因为 script 在 new_folder/，parent 就是 project_root
+project_root = script_dir.parent  # Since script is in new_folder/, parent is project_root
 
 pyrca_path = project_root / "PyRCA"
 config_file = pyrca_path / "configs" / "bank_domain_knowledge.yaml"
 
 sys.path.insert(0, str(pyrca_path))
 
-from rca import RCAEngine
-from Bank_enhanced_domain_mapping import ENHANCED_DOMAIN_MAPPING
+try:
+    from rca import RCAEngine
+    from Bank_enhanced_domain_mapping import ENHANCED_DOMAIN_MAPPING
+except ImportError as e:
+    print(f"⚠️  Failed to import PyRCA related modules: {e}, some functions will be unavailable")
+    ENHANCED_DOMAIN_MAPPING = None
 
-# 使用 config_file
-print(config_file)  # 应该输出正确路径
+# Use config_file
+print(f"📄 Configuration file path: {config_file}")  # Should output the correct path
 
 class ClusterBasedBankRCAAnalyzer:
     def __init__(self):
@@ -32,7 +35,7 @@ class ClusterBasedBankRCAAnalyzer:
         total_attrs = sum(
             len(attrs) for mapping in self.domain_mapping.values() for attrs in mapping.values()
         ) if self.domain_mapping else 0
-        print(f"🎯 加载增强领域映射: {total_attrs} 个属性")
+        print(f"🎯 Loaded enhanced domain mapping: {total_attrs} attributes")
 
         self.call_chain_layers = {
             'entry_point': ['apache01', 'apache02'],
@@ -47,9 +50,9 @@ class ClusterBasedBankRCAAnalyzer:
         self.chain_weights = {
             'gateway': 1.0,
             'business': 0.9,
+            'database': 0.95,
             'governance': 0.8,
             'container': 0.7,
-            'database': 0.95,
             'cache': 0.6,
             'entry_point': 0.5
         }
@@ -107,7 +110,7 @@ class ClusterBasedBankRCAAnalyzer:
         return indicators
 
     def prepare_anomalies_for_rca(self, anomalies):
-        """将原始 anomaly 转为带 layer 和 indicator 的格式"""
+        """Convert raw anomalies to format with layer and indicator"""
         enriched = []
         for a in anomalies:
             layer = self._identify_service_layer(a['entity'])
@@ -125,12 +128,12 @@ class ClusterBasedBankRCAAnalyzer:
         return enriched
 
     def analyze_with_rca_engine(self, cluster_id, anomalies):
-        """执行 RCA 分析（简化版，若 PyRCA 不可用则返回统计推测）"""
+        """Perform RCA analysis (simplified version, return statistical inference if PyRCA is unavailable)"""
         enriched = self.prepare_anomalies_for_rca(anomalies)
         if not enriched:
             return "No valid anomalies for RCA."
 
-        # 统计指标权重
+        # Statistic indicator weights
         indicator_weights = {}
         indicator_counts = {}
         for anno in enriched:
@@ -154,17 +157,17 @@ class ClusterBasedBankRCAAnalyzer:
                     'count': count
                 })
         
-        # 按权重排序，选择最重要的指标
+        # Sort by weight and select the most important indicators
         weighted_indicators.sort(key=lambda x: x['weight'], reverse=True)
         top_indicators = [item['indicator'] for item in weighted_indicators[:5]]
         
-        print(f"🔍 Cluster {cluster_id} - RCAEngine分析")
-        print(f"   检测到异常指标: {top_indicators}")
+        print(f"🔍 Cluster {cluster_id} - RCAEngine Analysis")
+        print(f"   Detected anomaly indicators: {top_indicators}")
         for item in weighted_indicators[:3]:
-            print(f"   • {item['indicator']}: 权重={item['weight']:.3f}, 频率={item['frequency']:.2f}")
+            print(f"   • {item['indicator']}: Weight={item['weight']:.3f}, Frequency={item['frequency']:.2f}")
         
 
-        # 尝试使用 RCAEngine
+        # Try to use RCAEngine
         try:
             from rca import RCAEngine
             bank_domain_knowledge_file = config_file
@@ -176,8 +179,8 @@ class ClusterBasedBankRCAAnalyzer:
                 'top_indicators': top_indicators
             }
         except Exception as e:
-            # 回退到基于权重的推测
-            lines = ["📊 基于调用链权重的根因推测（RCAEngine不可用）:"]
+            # Fallback to weight-based inference
+            lines = ["📊 Root cause inference based on call chain weights (RCAEngine unavailable):"]
             layer_weights = defaultdict(float)
             for anno in enriched:
                 layer = anno['layer']
@@ -186,25 +189,33 @@ class ClusterBasedBankRCAAnalyzer:
             if sorted_layers:
                 top_layer = sorted_layers[0][0]
                 mapping = {
-                    'database': 'DATABASE层问题 (关键数据存储)',
-                    'gateway': 'GATEWAY层问题 (入口网关异常)',
-                    'business': 'BUSINESS层问题 (核心业务逻辑异常)'
+                    'database': 'DATABASE layer issue (critical data storage)',
+                    'gateway': 'GATEWAY layer issue (entry gateway anomaly)',
+                    'business': 'BUSINESS layer issue (core business logic anomaly)'
                 }
-                guess = mapping.get(top_layer, f"{top_layer.upper()}层问题")
-                lines.append(f"⚠️ 主要根因推测: {guess}")
+                guess = mapping.get(top_layer, f"{top_layer.upper()} layer issue")
+                lines.append(f"⚠️  Primary root cause inference: {guess}")
             if weighted_indicators:
-                lines.append("📈 高权重指标:")
+                lines.append("📈 High weight indicators:")
                 for item in weighted_indicators[:3]:
-                    lines.append(f"  • {item['indicator']}: 权重={item['weight']:.3f}, 出现{item['count']}次")
+                    lines.append(f"  • {item['indicator']}: Weight={item['weight']:.3f}, Occurred {item['count']} times")
             return "\n".join(lines)
 
-# === 原始时间/加载/聚类逻辑（第一个脚本）===
-
+# === Original Time/Loading/Clustering Logic (first script) ===
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-def ts_to_beijing_str(ts):
+def ts_to_beijing_str(ts, format_type="long"):
+    """
+    Convert timestamp to Beijing timezone string
+    :param ts: Timestamp (seconds)
+    :param format_type: "long" (with CST) / "short" (input format for log_query.py: YYYY_MM_DD HH:MM:SS)
+    :return: Formatted time string
+    """
     dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(BEIJING_TZ)
-    return dt.strftime("%Y-%m-%d %H:%M:%S") + " CST"
+    if format_type == "short":
+        return dt.strftime("%Y_%m_%d %H:%M:%S")
+    else:
+        return dt.strftime("%Y-%m-%d %H:%M:%S") + " CST"
 
 def load_anomalies_from_window(base_dir, date_str, window_str):
     anomalies = []
@@ -290,6 +301,82 @@ def extract_keywords(template):
         keywords.add("Timeout")
     return sorted(keywords)
 
+# === Added: Call log_query.py to generate multi-grain reports ===
+def run_log_query(start_time_short, end_time_short, grain, temp_output_path):
+    """
+    Call log_query.py to generate anomaly query report for specified grain
+    :param start_time_short: Start time (format: YYYY_MM_DD HH:MM:SS)
+    :param end_time_short: End time (format: YYYY_MM_DD HH:MM:SS)
+    :param grain: Time grain (1min/5min/15min)
+    :param temp_output_path: Temporary report output path
+    :return: Report content (string) / error message
+    """
+    # Locate log_query.py path (assumed to be in the same directory as current script)
+    query_script_path = Path(__file__).resolve().parent / "log_query.py"
+    if not query_script_path.exists():
+        return f"❌ log_query.py script not found, path: {query_script_path}"
+    
+    # Construct command line arguments
+    cmd = [
+        sys.executable, "-u", str(query_script_path),
+        "--start-time", start_time_short,
+        "--end-time", end_time_short,
+        "--grain", grain,
+        "--output", str(temp_output_path)
+    ]
+    
+    try:
+        # Execute external script
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300  # Timeout: 5 minutes
+        )
+        
+        # Read generated report file
+        if os.path.exists(temp_output_path):
+            with open(temp_output_path, 'r', encoding='utf-8') as f:
+                report_content = f.read()
+            # Delete temporary file (optional, can keep if needed)
+            os.remove(temp_output_path)
+            return f"📋 {grain} grain anomaly query report\n" + "="*50 + "\n" + report_content + "\n" + "="*50 + "\n"
+        else:
+            return f"⚠️  {grain} grain report generation failed, script output:\n{result.stdout}\nError message:\n{result.stderr}"
+    except subprocess.TimeoutExpired:
+        return f"❌ {grain} grain script execution timed out (exceeded 5 minutes)"
+    except Exception as e:
+        return f"❌ {grain} grain execution exception: {str(e)}"
+
+def generate_multi_grain_reports(start_ts, end_ts, cluster_idx, temp_dir):
+    """
+    Generate 3 types of grain anomaly query reports
+    :param start_ts: Cluster start timestamp
+    :param end_ts: Cluster end timestamp
+    :param cluster_idx: Cluster number (for distinguishing temporary files)
+    :param temp_dir: Temporary file directory
+    :return: Multi-grain report summary string
+    """
+    # Convert time format to log_query.py required format
+    start_time_short = ts_to_beijing_str(start_ts, format_type="short")
+    end_time_short = ts_to_beijing_str(end_ts, format_type="short")
+    
+    # Create temporary directory
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Traverse 3 grains and generate reports
+    grains = ["1min", "5min", "15min"]
+    multi_grain_report = []
+    multi_grain_report.append(f"\n📊 Cluster multi-grain anomaly query report (Time range: {start_time_short} ~ {end_time_short})\n")
+    
+    for grain in grains:
+        temp_output = os.path.join(temp_dir, f"temp_cluster_{cluster_idx}_{grain}_report.txt")
+        report_content = run_log_query(start_time_short, end_time_short, grain, temp_output)
+        multi_grain_report.append(report_content)
+    
+    return "\n".join(multi_grain_report)
+
+# === Modified: Embed multi-grain reports in cluster_and_report ===
 def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2, args=None):
     if not anomalies:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -311,33 +398,37 @@ def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2, a
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-    # 初始化 RCA 分析器
+    # Initialize RCA Analyzer
     rca_analyzer = ClusterBasedBankRCAAnalyzer()
+    
+    # Initialize temporary directory (for storing log_query.py temporary reports)
+    temp_dir = os.path.join(os.path.dirname(output_file), "temp_query_reports")
+    os.makedirs(temp_dir, exist_ok=True)
 
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(f"🔍 Anomaly Clustering Report for {args.date_online} {args.output_suffix}\n")
         f.write("=" * 80 + "\n\n")
         
-        f.write(f"\n📊 发现 {len(clusters)} 个cluster:")
-        f.write("\nCurrent root cause analysis is completely based on bank call chain architecture:")
+        f.write(f"\n📊 Found {len(clusters)} clusters:\n")
+        f.write("Current root cause analysis is completely based on bank call chain architecture:\n")
         f.write("\n")
-        f.write("ROOT_request (69.9% confidence) - Corresponds to IG Gateway Layer (Weight: 1.0)")
-        f.write("  Impact Path: IG01, IG02 → request metric → application exception")
-        f.write("  This is the most important layer in the banking system")
+        f.write("ROOT_request (69.9% confidence) - Corresponds to IG Gateway Layer (Weight: 1.0)\n")
+        f.write("  Impact Path: IG01, IG02 → request metric → application exception\n")
+        f.write("  This is the most important layer in the banking system\n")
         f.write("\n")
-        f.write("ROOT_db (99.1% confidence) - Corresponds to MySQL Database Layer (Weight: 0.95)")
-        f.write("  Impact Path: Mysql01, Mysql02 → db metric → application exception")
-        f.write("  Primary root cause detected in Cluster 3")
+        f.write("ROOT_db (99.1% confidence) - Corresponds to MySQL Database Layer (Weight: 0.95)\n")
+        f.write("  Impact Path: Mysql01, Mysql02 → db metric → application exception\n")
+        f.write("  Primary root cause detected in Cluster 3\n")
         f.write("\n")
-        f.write("ROOT_gen_size (62.6% confidence) - Corresponds to Tomcat Business Layer (Weight: 0.9)")
-        f.write("  Impact Path: Tomcat01-04 → JVM memory → application exception")
+        f.write("ROOT_gen_size (62.6% confidence) - Corresponds to Tomcat Business Layer (Weight: 0.9)\n")
+        f.write("  Impact Path: Tomcat01-04 → JVM memory → application exception\n")
         f.write("\n")
-        f.write("ROOT_conn_pool (61.4% confidence) - Corresponds to Tomcat Business Layer Connection Pool (Weight: 0.9)")
-        f.write("  Impact Path: Tomcat01-04 → database connection pool → application exception")
+        f.write("ROOT_conn_pool (61.4% confidence) - Corresponds to Tomcat Business Layer Connection Pool (Weight: 0.9)\n")
+        f.write("  Impact Path: Tomcat01-04 → database connection pool → application exception\n")
         f.write("\n")
-        f.write("ROOT_pod (65.1% confidence) - Corresponds to Docker Container Layer (Weight: 0.7)")
-        f.write("  Impact Path: dockerA1-A2, dockerB1-B2 → container resources → application exception")
-        f.write("="*70)
+        f.write("ROOT_pod (65.1% confidence) - Corresponds to Docker Container Layer (Weight: 0.7)\n")
+        f.write("  Impact Path: dockerA1-A2, dockerB1-B2 → container resources → application exception\n")
+        f.write("="*70 + "\n\n")
 
         cluster_ids = sorted(clusters.keys())
         f.write(f"🔍 The number of clusters are {len(cluster_ids)}\n")
@@ -349,6 +440,7 @@ def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2, a
             start_ts, end_ts = min(ts_vals), max(ts_vals)
             duration = end_ts - start_ts
 
+            # 1. Write cluster basic information
             f.write(f"🚨 Cluster #{idx + 1}\n")
             f.write(f"   Time Span: {ts_to_beijing_str(start_ts)} → {ts_to_beijing_str(end_ts)} "
                     f"(Δ = {duration} sec)\n")
@@ -378,23 +470,24 @@ def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2, a
 
                 for (ent, attr), timestamps in sorted(entity_attr_dict.items()):
                     ts_sorted = sorted(timestamps)
-                    time_repr = ", ".join(f"{ts} ({ts_to_beijing_str(ts)})" for ts in ts_sorted)
+                    time_repr = ", ".join(f"{ts} ({ts_to_beijing_str(ts)})" for ts in ts_sorted[:5])  # Truncate long output
+                    if len(ts_sorted) > 5:
+                        time_repr += f" ... (Total {len(ts_sorted)} timestamps)"
                     f.write(f"     • Entity: {ent} | Attribute: {attr}\n")
                     f.write(f"       Timestamps: {time_repr}\n")
                 f.write("\n")
 
-            # === 新增：RCA 分析结果 ===
+            # 2. Write RCA analysis results
             f.write("🔍 Root Cause Analysis (RCA) for this Cluster:\n")
             rca_result = rca_analyzer.analyze_with_rca_engine(idx, cluster)
             if isinstance(rca_result, dict):
-                # 显示权重
+                # Show weights
                 if 'indicator_weights' in rca_result:
-                    f.write("   📊 指标权重分析 (Top 3):\n")
+                    f.write("   📊 Indicator Weight Analysis (Top 3):\n")
                     for item in rca_result['indicator_weights'][:3]:
-                        f.write(f"      • {item['indicator']}: 权重={item['weight']:.3f}, 出现{item['count']}次\n")
-                # 显示 RCA 结果
+                        f.write(f"      • {item['indicator']}: Weight={item['weight']:.3f}, Occurred {item['count']} times\n")
+                # Show RCA results
                 rca_out = rca_result['rca_result']
-                
                 f.write(f"      RCA Result: {rca_out}\n")
                 
                 if isinstance(rca_out, list) and rca_out:
@@ -402,39 +495,62 @@ def cluster_and_report(anomalies, output_file, eps_seconds=300, min_samples=2, a
                     for cause in rca_out:
                         if isinstance(cause, dict) and 'root_cause' in cause:
                             conf = cause.get('score', 0) * 100
-                            f.write(f"      • {cause['root_cause']}: {conf:.1f}% 置信度\n")
+                            f.write(f"      • {cause['root_cause']}: {conf:.1f}% confidence\n")
                         else:
                             f.write(f"      • {cause}\n")
-                # else:
-                #     f.write(f"   ❓ RCA Result: {rca_out}\n")
             else:
-                # 字符串形式（回退）
+                # String format (fallback)
                 for line in str(rca_result).split('\n'):
                     f.write(f"   {line}\n")
             f.write("\n")
             f.write("-" * 60 + "\n\n")
 
+            # 3. Added: Generate and write multi-grain log_query.py reports
+            f.write("=" * 70 + "\n")
+            f.write(f"📋 Cluster #{idx + 1} Multi-Grain Anomaly Query Report\n")
+            f.write("=" * 70 + "\n")
+            multi_grain_report = generate_multi_grain_reports(
+                start_ts=start_ts,
+                end_ts=end_ts,
+                cluster_idx=idx+1,
+                temp_dir=temp_dir
+            )
+            f.write(multi_grain_report)
+            f.write("\n\n")
+            f.write("-" * 80 + "\n\n")
+
+        # 4. Write isolated anomalies
         if noise:
             f.write("🔕 Isolated Anomalies (Noise / Single Events):\n")
-            for a in sorted(noise, key=lambda x: x['ts']):
+            for a in sorted(noise, key=lambda x: x['ts'])[:20]:  # Truncate long output
                 f.write(f"   {a['type']} | {a['entity']} | {a['attribute']} | "
                         f"{a['ts']} ({ts_to_beijing_str(a['ts'])})\n")
+            if len(noise) > 20:
+                f.write(f"   ... (Total {len(noise)} isolated anomalies, showing first 20)\n")
             f.write("\n")
 
         f.write("💡 Note: 'CST' = China Standard Time (UTC+8).\n")
         f.write(f"   Clustering: DBSCAN(eps={eps_seconds}s, min_samples={min_samples})\n")
+        f.write(f"   Multi-grain reports generated by log_query.py (1min/5min/15min).\n")
 
-    print(f"✅ Report saved to: {output_file}")
+    # Delete temporary directory
+    try:
+        os.rmdir(temp_dir)
+    except OSError:
+        # Directory not empty (possibly undeleted temporary files), ignore
+        pass
+
+    print(f"✅ Comprehensive report saved to: {output_file}")
     print(f"📊 Found {len(cluster_ids)} clusters and {len(noise)} isolated anomalies.")
 
-# === 主程序 ===
+# === Main Program ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cluster anomalies and perform RCA in a specific half-hour window of Bank dataset.")
     parser.add_argument("--date_online", required=True, help="Date string like 2021_03_04")
     parser.add_argument("--output_suffix", required=True, help="Time window like 0030_0100")
     parser.add_argument("--eps", type=int, default=60, help="DBSCAN eps in seconds (default: 60 = 1 min)")
     parser.add_argument("--min_samples", type=int, default=3, help="DBSCAN min_samples (default: 3)")
-    parser.add_argument("--output_folder_name", type=str, default="1116",
+    parser.add_argument("--output_folder_name", type=str, default="1204",
                         help="Output folder name passed to run.sh (e.g., experiment ID)")
 
     args = parser.parse_args()

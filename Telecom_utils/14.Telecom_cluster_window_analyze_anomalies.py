@@ -261,7 +261,7 @@ if __name__ == "__main__":
     parser.add_argument("--date_online", required=True, help="Date string like 2020_04_11")
     parser.add_argument("--output_suffix", required=True, help="Time window like 0000_0030")
     parser.add_argument("--eps", type=int, default=60, help="DBSCAN eps in seconds (default: 60)")
-    parser.add_argument("--min_samples", type=int, default=2, help="DBSCAN min_samples (default: 2)")
+    parser.add_argument("--min_samples", type=int, default=3, help="DBSCAN min_samples (default: 3)")
     parser.add_argument("--output_folder_name", type=str, default="1216",
                         help="Output folder name (e.g., experiment ID)")
 
