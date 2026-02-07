@@ -5,7 +5,7 @@ import numpy as np
 plt.rcParams['mathtext.fontset'] = 'dejavusans'
 
 # 原始 reduction values (用于标签)
-reduction_vals = [0, 1, 2, 3, 4, 5]
+reduction_vals = [1, 2, 3, 4, 5, 6]
 x = np.arange(len(reduction_vals)) 
 
 # 数据
@@ -69,7 +69,7 @@ ax3.tick_params(axis='y', labelsize=12)
 
 ax3.set_xticks(x)
 ax3.set_xticklabels([str(v) for v in reduction_vals])
-ax3.set_xlabel('RAG Top k', fontsize=label_fontsize)
+ax3.set_xlabel('min samples (DBSCAN Clustering)', fontsize=label_fontsize)
 ax3.tick_params(axis='x', labelsize=12)
 ax3.tick_params(axis='y', labelsize=12)
 

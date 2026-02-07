@@ -398,18 +398,18 @@ class AnomalyResultQuery:
         """
         # 1. Build report header
         report = []
-        report.append("=" * 10)
-        report.append("Anomaly Detection Result Query Report (Only Categories with Valid Anomalies)")
+        # report.append("=" * 10)
+        # report.append("Anomaly Detection Result Query Report (Only Categories with Valid Anomalies)")
         # report.append("=" * 80)
         
         # 2. Add query information
         query_info = query_result.get("query_info", {})
-        report.append(f"\n[Query Information]")
-        report.append(f"Start Time: {query_info.get('start_time', 'Unknown')}")
-        report.append(f"End Time: {query_info.get('end_time', 'Unknown')}")
-        report.append(f"Time Granularity: {query_info.get('grain_flag', 'Unknown')}")
-        report.append(f"Query Date: {query_info.get('query_date', 'Unknown')}")
-        report.append(f"Time Span: {query_info.get('time_span_seconds', 0)} seconds")
+        # report.append(f"\n[Query Information]")
+        # report.append(f"Start Time: {query_info.get('start_time', 'Unknown')}")
+        # report.append(f"End Time: {query_info.get('end_time', 'Unknown')}")
+        # report.append(f"Time Granularity: {query_info.get('grain_flag', 'Unknown')}")
+        # report.append(f"Query Date: {query_info.get('query_date', 'Unknown')}")
+        # report.append(f"Time Span: {query_info.get('time_span_seconds', 0)} seconds")
         # report.append(f"Template File Path: {TEMPLATE_FILE_PATH}")
         # report.append(f"Note: Multi-dimensional anomaly is the overall anomaly of an entity, the associated single-dimensional template anomalies are shown below; categories without valid anomalies have been filtered")
         
@@ -426,11 +426,12 @@ class AnomalyResultQuery:
         # 4. Traverse categories with anomalies
         category_results = query_result.get("category_results", {})
         if not category_results:
-            report.append(f"\n[Category Anomaly Results]")
-            report.append(f"No valid anomaly records in any category within the query window")
+            # report.append(f"\n[Category Anomaly Results]")
+            # report.append(f"No valid anomaly records in any category within the query window")
+            report.append("")
         else:
-            report.append(f"\n[Category Anomaly Results]")
-            report.append(f"Total {len(category_results)} categories with valid anomalies found")
+            # report.append(f"\n[Category Anomaly Results]")
+            # report.append(f"Total {len(category_results)} categories with valid anomalies found")
             
             for category_name, category_data in category_results.items():
                 report.append(f"\n--- {category_name} ---")
@@ -460,7 +461,7 @@ class AnomalyResultQuery:
                     # Control display count to avoid overlength
                     display_count = min(10, len(single_dim_anomaly_details))
                     for idx, detail in enumerate(single_dim_anomaly_details[:display_count], 1):
-                        report.append(f"    Record {idx}:")
+                        # report.append(f"    Record {idx}:")
                         report.append(f"      Entity: {detail['entity_name']}")
                         # report.append(f"      Template ID: {detail['template_id']}")
                         report.append(f"      Anomaly Time: {detail['datetime']}")
@@ -470,14 +471,15 @@ class AnomalyResultQuery:
                     if len(single_dim_anomaly_details) > display_count:
                         report.append(f"    ... Omitted {len(single_dim_anomaly_details) - display_count} single-dimensional anomaly records (modify display_count to show all)")
                 else:
-                    report.append(f"\n  [Single-dimensional Anomaly Details]: No single-dimensional anomaly records in this category")
+                    # report.append(f"\n  [Single-dimensional Anomaly Details]: No single-dimensional anomaly records in this category")
+                    report.append("")
                 
                 # ========== Multi-dimensional Anomaly Details (with associated single-dimensional sources) ==========
                 multi_dim_anomaly_details = category_data.get("multi_dim_anomaly_details", [])
                 if multi_dim_anomaly_details:
                     report.append(f"\n  [Multi-dimensional Anomaly Details] (Total {len(multi_dim_anomaly_details)} anomaly records, with anomaly sources)")
                     for idx, detail in enumerate(multi_dim_anomaly_details, 1):
-                        report.append(f"    Record {idx}:")
+                        # report.append(f"    Record {idx}:")
                         report.append(f"      Entity: {detail['entity_name']}")
                         report.append(f"      Anomaly Time: {detail['datetime']}")
                         # report.append(f"      Anomaly Score: {detail['anomaly_score']}")
@@ -492,7 +494,8 @@ class AnomalyResultQuery:
                             report.append(f"      Anomaly Sources: No clear single-dimensional anomalies to support (may be caused by aggregation logic)")
                         report.append(f"      ————————————————————————————————")
                 else:
-                    report.append(f"\n  [Multi-dimensional Anomaly Details]: No multi-dimensional anomaly records in this category")
+                    # report.append(f"\n  [Multi-dimensional Anomaly Details]: No multi-dimensional anomaly records in this category")
+                    report.append("")
         
         # 5. Save report to file if path is specified
         final_report = "\n".join(report)
