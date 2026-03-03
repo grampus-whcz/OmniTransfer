@@ -1,5 +1,5 @@
 #！/bin/bash
-# nohup bash anomaly.sh > anomaly_4.log 2>&1 &
+# nohup bash anomaly.sh > anomaly_5.log 2>&1 &
 
 # Convert to Unix timestamp (UTC)
 # 2021-03-06 23:30:00 UTC → 1615044600
@@ -56,7 +56,14 @@
 #     --data_dir data3 \
 #     --output_suffix 0000_0030
 
-python 14.Telecom_cluster_window_analyze_anomalies.py \
+# python 14.Telecom_cluster_window_analyze_anomalies.py \
+#   --date_online 2020_04_11 \
+#   --output_suffix 0000_0030 \
+#   --eps 60 \
+#   --min_samples 2 \
+#   --output_folder_name 1216
+
+python 14.Telecom_cluster_window_analyze_anomalies.3.3.py \
   --date_online 2020_04_11 \
   --output_suffix 0000_0030 \
   --eps 60 \
