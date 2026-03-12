@@ -9,49 +9,6 @@ from datetime import datetime, timezone, timedelta
 import argparse
 
 # === 全局配置 ===
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 3             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.3                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.4             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.3                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 1  # 分析起点时间戳索引
-
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.3                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.1             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.6                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 1  # 分析起点时间戳索引
-
-# tune3
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.1                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.1             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.8                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune4: 时间权重降低，拓扑权重适当提升，分析起点调整到第3个时间戳（更早的异常可能更有价值）
-# CONCENTRATION_WINDOW_MINUTES = 7  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.05                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.05             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9               # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 3  # 分析起点时间戳索引
-
-# tune6
-# CONCENTRATION_WINDOW_MINUTES = 15  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.05                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.05             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9               # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 4  # 分析起点时间戳索引
-
 # tune5
 CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
 ANOMALY_THRESHOLD = 1             # 异常数阈值
@@ -60,141 +17,6 @@ WEIGHT_TIME = 0.025                 # 时间权重（越早异常权重越高）
 WEIGHT_TOPOLOGY = 0.025             # 拓扑权重（依赖影响范围）
 WEIGHT_COUNT = 0.95                # 异常数权重
 ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune7
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0125                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0125             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.975                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune8
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.05                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.05             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune9
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.035                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.035             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.93                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune10
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.025                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.015             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.96                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune11
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.015                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.025             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.96                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune12
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.035                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.035             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.93                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune13
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.02                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.02             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.96                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune14
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.024                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.024             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.952                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune15
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.026                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.026             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.948                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # # tune16
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0245                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0245             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.951                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune17
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0252                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0252             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.946                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # # tune18
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0249                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0249             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9502                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# # tune19
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0252                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0252             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9496                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune20
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0246                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0246             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9508                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
-
-# tune21
-# CONCENTRATION_WINDOW_MINUTES = 5  # 分析时间窗口
-# ANOMALY_THRESHOLD = 1             # 异常数阈值
-# FALLBACK_THRESHOLD = 1            # 兜底阈值
-# WEIGHT_TIME = 0.0248                 # 时间权重（越早异常权重越高）
-# WEIGHT_TOPOLOGY = 0.0248             # 拓扑权重（依赖影响范围）
-# WEIGHT_COUNT = 0.9504                # 异常数权重
-# ANALYSIS_START_TIMESTAMP_INDEX = 2  # 分析起点时间戳索引
 
 # 北京时区 (UTC+8)
 BEIJING_TZ = timezone(timedelta(hours=8))
@@ -241,6 +63,20 @@ def ts_to_beijing_str(ts):
         return dt.strftime("%Y-%m-%d %H:%M:%S") + " CST"
     except:
         return "N/A"
+
+def ts_to_graph_node_format(ts):
+    """将时间戳转为图谱节点命名格式（Time_年月日时分）"""
+    try:
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(BEIJING_TZ)
+        return f"Time_{dt.strftime('%Y%m%d%H%M')}"
+    except:
+        return f"Time_unknown_{ts}"
+
+def extract_main_entity(entity_str):
+    """从子实体中提取主实体（如 docker_001:LOCAL,db_009 → docker_001）"""
+    if ':' in entity_str:
+        return entity_str.split(':')[0]
+    return entity_str
 
 # === Telecom 专用拓扑 RCA 分析器 ===
 class TelecomTopologyRCAAnalyzer:
@@ -318,7 +154,8 @@ class TelecomTopologyRCAAnalyzer:
 
     def _get_component_type(self, entity):
         """获取组件类型（os/docker/db）"""
-        return self.component_types.get(entity, 'unknown')
+        main_entity = extract_main_entity(entity)
+        return self.component_types.get(main_entity, 'unknown')
 
     def _map_fault_type(self, attribute):
         """从属性映射到故障类型"""
@@ -344,7 +181,8 @@ class TelecomTopologyRCAAnalyzer:
                 'timestamp': a['ts'],
                 'component_type': component_type,
                 'fault_type': fault_type,
-                'component_weight': COMPONENT_WEIGHTS.get(component_type, 0.5)
+                'component_weight': COMPONENT_WEIGHTS.get(component_type, 0.5),
+                'main_entity': extract_main_entity(entity)
             })
         return enriched
 
@@ -393,16 +231,17 @@ class TelecomTopologyRCAAnalyzer:
             # Step 3: 拓扑特征计算
             def get_topology_features(entity):
                 """获取拓扑特征（入度/出度/可达节点数）"""
-                if entity not in self.global_topology.nodes:
+                main_entity = extract_main_entity(entity)
+                if main_entity not in self.global_topology.nodes:
                     return 0, 0, 0
                 
                 # 入度/出度
-                in_degree = self.global_topology.in_degree(entity)
-                out_degree = self.global_topology.out_degree(entity)
+                in_degree = self.global_topology.in_degree(main_entity)
+                out_degree = self.global_topology.out_degree(main_entity)
                 
                 # 可达节点数（影响范围）
                 try:
-                    reachable_nodes = nx.descendants(self.global_topology, entity)
+                    reachable_nodes = nx.descendants(self.global_topology, main_entity)
                     reachable_count = len(reachable_nodes)
                 except:
                     reachable_count = 0
@@ -526,9 +365,10 @@ class TelecomTopologyRCAAnalyzer:
             report.append(f"- **Topology Impact**: {reachable_count} downstream entities affected")
             
             # 依赖路径
-            if root_cause in G.nodes:
+            main_root_entity = extract_main_entity(root_cause)
+            if main_root_entity in G.nodes:
                 try:
-                    neighbors = list(G.neighbors(root_cause))[:5]
+                    neighbors = list(G.neighbors(main_root_entity))[:5]
                     if neighbors:
                         report.append(f"- **Direct Dependencies**: {', '.join(neighbors)}")
                 except:
@@ -718,8 +558,290 @@ def load_anomalies_from_window_new(base_dir, date_str, window_str):
           f"(original total: {len(raw_anomalies)})")
     return unique_anomalies
 
+# === 新增：知识图谱构建函数 ===
+def build_cluster_knowledge_graph(cluster_id, cluster_anomalies, rca_analyzer, output_dir, date_str, window_str):
+    """
+    为单个聚类构建知识图谱，并输出多种格式的图谱文件：
+    1. JSON格式的图谱结构（节点+关系）
+    2. Neo4j Cypher导入脚本
+    3. NetworkX可视化图（GEXF格式）
+    
+    Args:
+        cluster_id: 聚类ID（如 1, 2, 3）
+        cluster_anomalies: 该聚类的异常列表
+        rca_analyzer: RCA分析器实例
+        output_dir: 输出目录
+        date_str: 日期字符串（如 2020_04_11）
+        window_str: 时间窗口（如 0000_0030）
+    """
+    # 创建输出子目录
+    kg_output_dir = os.path.join(output_dir, f"knowledge_graphs", f"cluster_{cluster_id}")
+    os.makedirs(kg_output_dir, exist_ok=True)
+    
+    # 1. 初始化图谱节点和关系
+    nodes = []          # 节点列表：[{"id": "Time_202005260500", "label": "Time", "properties": {...}}]
+    relationships = []  # 关系列表：[{"source": "Time_202005260500", "target": "os_001", "type": "HAS", "properties": {...}}]
+    node_id_set = set() # 避免重复节点
+    
+    # 2. 增强异常数据
+    enriched_anomalies = rca_analyzer.prepare_anomalies_for_rca(cluster_anomalies)
+    
+    # 3. 构建基础节点
+    # 3.1 时间节点
+    ts_list = sorted(list(set([a['ts'] for a in cluster_anomalies])))
+    time_nodes = {}
+    for ts in ts_list:
+        time_node_id = ts_to_graph_node_format(ts)
+        time_nodes[ts] = time_node_id
+        if time_node_id not in node_id_set:
+            nodes.append({
+                "id": time_node_id,
+                "label": "Time",
+                "properties": {
+                    "timestamp": ts,
+                    "time_str": ts_to_beijing_str(ts),
+                    "cluster_id": cluster_id
+                }
+            })
+            node_id_set.add(time_node_id)
+    
+    # 3.2 故障类型节点
+    fault_types = list(set([a['fault_type'] for a in enriched_anomalies]))
+    fault_nodes = {}
+    for fault_type in fault_types:
+        fault_node_id = f"Fault_{fault_type.replace(' ', '_')}"
+        fault_nodes[fault_type] = fault_node_id
+        if fault_node_id not in node_id_set:
+            nodes.append({
+                "id": fault_node_id,
+                "label": "FaultType",
+                "properties": {
+                    "fault_type": fault_type,
+                    "cluster_id": cluster_id
+                }
+            })
+            node_id_set.add(fault_node_id)
+    
+    # 3.3 异常属性节点
+    attributes = list(set([a['attribute'] for a in cluster_anomalies]))
+    attr_nodes = {}
+    for attr in attributes:
+        attr_node_id = f"Attr_{attr.replace(' ', '_').replace(':', '_').replace(',', '_')}"
+        attr_nodes[attr] = attr_node_id
+        if attr_node_id not in node_id_set:
+            nodes.append({
+                "id": attr_node_id,
+                "label": "AnomalyAttribute",
+                "properties": {
+                    "attribute": attr,
+                    "fault_type": rca_analyzer._map_fault_type(attr),
+                    "cluster_id": cluster_id
+                }
+            })
+            node_id_set.add(attr_node_id)
+    
+    # 3.4 实体节点（主实体+子实体）
+    entities = list(set([a['entity'] for a in cluster_anomalies]))
+    entity_nodes = {}
+    main_entity_map = {}  # 子实体→主实体映射
+    
+    for entity in entities:
+        main_entity = extract_main_entity(entity)
+        main_entity_map[entity] = main_entity
+        
+        # 主实体节点
+        if main_entity not in node_id_set:
+            component_type = rca_analyzer._get_component_type(main_entity)
+            nodes.append({
+                "id": main_entity,
+                "label": component_type.upper(),
+                "properties": {
+                    "entity_type": component_type,
+                    "is_main_entity": True,
+                    "cluster_id": cluster_id
+                }
+            })
+            node_id_set.add(main_entity)
+            entity_nodes[main_entity] = main_entity
+        
+        # 子实体节点（如果不是主实体）
+        if entity != main_entity and entity not in node_id_set:
+            component_type = rca_analyzer._get_component_type(entity)
+            nodes.append({
+                "id": entity,
+                "label": f"{component_type.upper()}_Sub",
+                "properties": {
+                    "entity_type": component_type,
+                    "is_main_entity": False,
+                    "main_entity": main_entity,
+                    "cluster_id": cluster_id
+                }
+            })
+            node_id_set.add(entity)
+            entity_nodes[entity] = entity
+    
+    # 4. 构建关系
+    # 4.1 时间→实体（发生异常）
+    for a in cluster_anomalies:
+        time_node_id = time_nodes[a['ts']]
+        entity_id = entity_nodes[a['entity']]
+        relationships.append({
+            "source": time_node_id,
+            "target": entity_id,
+            "type": "HAS_ANOMALY",
+            "properties": {
+                "anomaly_type": a['type'],
+                "timestamp": a['ts'],
+                "cluster_id": cluster_id
+            }
+        })
+    
+    # 4.2 实体→异常属性
+    for a in cluster_anomalies:
+        entity_id = entity_nodes[a['entity']]
+        attr_node_id = attr_nodes[a['attribute']]
+        relationships.append({
+            "source": entity_id,
+            "target": attr_node_id,
+            "type": "HAS_ATTRIBUTE",
+            "properties": {
+                "anomaly_type": a['type'],
+                "timestamp": a['ts'],
+                "cluster_id": cluster_id
+            }
+        })
+    
+    # 4.3 异常属性→故障类型
+    for a in enriched_anomalies:
+        attr_node_id = attr_nodes[a['attribute']]
+        fault_node_id = fault_nodes[a['fault_type']]
+        relationships.append({
+            "source": attr_node_id,
+            "target": fault_node_id,
+            "type": "MAPS_TO_FAULT",
+            "properties": {
+                "confidence": 1.0 if a['fault_type'] != 'unknown' else 0.5,
+                "cluster_id": cluster_id
+            }
+        })
+    
+    # 4.4 子实体→主实体
+    for entity in entities:
+        main_entity = main_entity_map[entity]
+        if entity != main_entity:
+            relationships.append({
+                "source": entity,
+                "target": main_entity,
+                "type": "BELONGS_TO",
+                "properties": {
+                    "cluster_id": cluster_id
+                }
+            })
+    
+    # 4.5 添加拓扑依赖关系（主实体之间）
+    topology_graph = rca_analyzer.global_topology
+    main_entities_in_cluster = list(set(main_entity_map.values()))
+    for main_entity in main_entities_in_cluster:
+        if main_entity in topology_graph.nodes:
+            neighbors = list(topology_graph.neighbors(main_entity))
+            for neighbor in neighbors:
+                if neighbor in main_entities_in_cluster and neighbor in node_id_set:
+                    # 添加双向依赖关系
+                    relationships.append({
+                        "source": main_entity,
+                        "target": neighbor,
+                        "type": "TOPOLOGY_DEPENDS_ON",
+                        "properties": {
+                            "cluster_id": cluster_id,
+                            "dependency_type": "bidirectional"
+                        }
+                    })
+    
+    # 5. 输出JSON格式图谱
+    kg_json = {
+        "cluster_id": cluster_id,
+        "total_anomalies": len(cluster_anomalies),
+        "time_span": {
+            "start": ts_to_beijing_str(min(ts_list)),
+            "end": ts_to_beijing_str(max(ts_list)),
+            "duration_sec": max(ts_list) - min(ts_list)
+        },
+        "nodes": nodes,
+        "relationships": relationships
+    }
+    
+    json_file = os.path.join(kg_output_dir, f"cluster_{cluster_id}_kg.json")
+    with open(json_file, 'w', encoding='utf-8') as f:
+        json.dump(kg_json, f, ensure_ascii=False, indent=2)
+    print(f"📄 JSON格式图谱已保存: {json_file}")
+    
+    # 6. 生成Neo4j Cypher导入脚本
+    cypher_lines = [
+        f"// 聚类 {cluster_id} 异常知识图谱导入脚本",
+        f"// 生成时间: {datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')}",
+        f"// 异常数量: {len(cluster_anomalies)}",
+        "",
+        "// 清空原有数据（可选）",
+        "// MATCH (n) WHERE n.cluster_id = {cluster_id} DELETE n;",
+        "",
+        "// 创建节点",
+    ]
+    
+    # 6.1 创建节点Cypher
+    for node in nodes:
+        props = []
+        for k, v in node['properties'].items():
+            if isinstance(v, str):
+                props.append(f"{k}: '{v}'")
+            else:
+                props.append(f"{k}: {v}")
+        props_str = ", ".join(props)
+        cypher_lines.append(f"CREATE (:{node['label']} {{id: '{node['id']}', {props_str}}});")
+    
+    cypher_lines.extend(["", "// 创建关系"])
+    
+    # 6.2 创建关系Cypher
+    rel_id = 0
+    for rel in relationships:
+        props = []
+        for k, v in rel['properties'].items():
+            if isinstance(v, str):
+                props.append(f"{k}: '{v}'")
+            else:
+                props.append(f"{k}: {v}")
+        props_str = ", ".join(props) if props else ""
+        cypher_lines.append(f"""
+MATCH (s {{id: '{rel['source']}'}}), (t {{id: '{rel['target']}'}})
+CREATE (s)-[:{rel['type']} {{id: 'rel_{cluster_id}_{rel_id}', {props_str}}}]->(t);
+""")
+        rel_id += 1
+    
+    # 保存Cypher脚本
+    cypher_file = os.path.join(kg_output_dir, f"cluster_{cluster_id}_neo4j_import.cypher")
+    with open(cypher_file, 'w', encoding='utf-8') as f:
+        f.write("\n".join(cypher_lines))
+    print(f"📜 Neo4j Cypher脚本已保存: {cypher_file}")
+    
+    # 7. 生成NetworkX可视化图（GEXF格式）
+    G = nx.DiGraph()
+    
+    # 添加节点
+    for node in nodes:
+        G.add_node(node['id'], **node['properties'], label=node['label'])
+    
+    # 添加关系
+    for rel in relationships:
+        G.add_edge(rel['source'], rel['target'], **rel['properties'], type=rel['type'])
+    
+    # 保存GEXF文件（可用于Gephi可视化）
+    gexf_file = os.path.join(kg_output_dir, f"cluster_{cluster_id}_visualization.gexf")
+    nx.write_gexf(G, gexf_file)
+    print(f"🎨 GEXF可视化文件已保存: {gexf_file}")
+    
+    return kg_json
+
 # === 重构的聚类和报告生成逻辑 ===
-def cluster_and_report(anomalies, output_file, dependency_graphs_path, eps_seconds=300, min_samples=2):
+def cluster_and_report(anomalies, output_file, dependency_graphs_path, date_str, window_str, eps_seconds=300, min_samples=2):
     if not anomalies:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, 'w') as f:
@@ -751,7 +873,7 @@ def cluster_and_report(anomalies, output_file, dependency_graphs_path, eps_secon
 
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(f"🔍 Telecom Anomaly Clustering & Root Cause Analysis Report\n")
-        f.write(f"📅 Date: {args.date_online} | Window: {args.output_suffix}\n")
+        f.write(f"📅 Date: {date_str} | Window: {window_str}\n")
         f.write(f"⚙️  RCA Methodology: Time({WEIGHT_TIME*100}%) + Topology({WEIGHT_TOPOLOGY*100}%) + Count({WEIGHT_COUNT*100}%)\n")
         f.write("=" * 80 + "\n\n")
 
@@ -803,6 +925,16 @@ def cluster_and_report(anomalies, output_file, dependency_graphs_path, eps_secon
             f.write(rca_report)
             f.write("\n")
             f.write("-" * 80 + "\n\n")
+            
+            # 为该聚类构建知识图谱
+            build_cluster_knowledge_graph(
+                cluster_id=idx + 1,
+                cluster_anomalies=cluster,
+                rca_analyzer=rca_analyzer,
+                output_dir=os.path.dirname(output_file),
+                date_str=date_str,
+                window_str=window_str
+            )
 
         # 孤立异常
         if noise:
@@ -812,6 +944,16 @@ def cluster_and_report(anomalies, output_file, dependency_graphs_path, eps_secon
                 fault_type = rca_analyzer._map_fault_type(a['attribute'])
                 f.write(f"- {a['type']} | {a['entity']} | {a['attribute']} | Fault: {fault_type} | {ts_to_beijing_str(a['ts'])}\n")
             f.write("\n")
+            
+            # 为孤立异常构建单独的知识图谱
+            build_cluster_knowledge_graph(
+                cluster_id="noise",
+                cluster_anomalies=noise,
+                rca_analyzer=rca_analyzer,
+                output_dir=os.path.dirname(output_file),
+                date_str=date_str,
+                window_str=window_str
+            )
 
         # 元数据
         f.write("### Analysis Metadata\n")
@@ -821,9 +963,11 @@ def cluster_and_report(anomalies, output_file, dependency_graphs_path, eps_secon
         f.write(f"- Component Weights: DB=1.0, OS=0.9, Docker/Pod=0.85\n")
         f.write(f"- Fault Types: CPU fault, network delay, network loss, db connection limit, db close\n")
         f.write(f"- Dependency Graph: Loaded from {dependency_graphs_path} ({rca_analyzer.global_topology.number_of_nodes()} nodes, {rca_analyzer.global_topology.number_of_edges()} edges)\n")
+        f.write(f"- Knowledge Graphs: Generated in {os.path.join(os.path.dirname(output_file), 'knowledge_graphs')}\n")
 
     print(f"✅ Report saved to: {output_file}")
     print(f"📊 Found {len(cluster_ids)} clusters and {len(noise)} isolated anomalies.")
+    print(f"📈 Knowledge graphs saved to: {os.path.join(os.path.dirname(output_file), 'knowledge_graphs')}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cluster anomalies with topology-based RCA for Telecom dataset.")
@@ -850,6 +994,8 @@ if __name__ == "__main__":
         anomalies,
         output_file=output_file,
         dependency_graphs_path=args.dependency_graphs,
+        date_str=args.date_online,
+        window_str=args.output_suffix,
         eps_seconds=args.eps,
         min_samples=args.min_samples
     )
