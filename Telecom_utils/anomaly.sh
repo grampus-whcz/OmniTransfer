@@ -1,5 +1,5 @@
 #！/bin/bash
-# nohup bash anomaly.sh > anomaly_7.log 2>&1 &
+# nohup bash anomaly.sh > anomaly_8.log 2>&1 &
 
 # Convert to Unix timestamp (UTC)
 # 2021-03-06 23:30:00 UTC → 1615044600
@@ -70,4 +70,7 @@
 #   --min_samples 2 \
 #   --output_folder_name 1216
 
-python 15.Telecom_knowledge_graph_RCA.py
+python 15.Telecom_knowledge_graph_RCA.py \
+  --date_online 2020_04_11 \
+  --output_suffix 0000_0030 \
+  --output_folder_name 1216

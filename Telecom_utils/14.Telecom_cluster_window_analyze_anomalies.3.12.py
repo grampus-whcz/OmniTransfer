@@ -575,7 +575,7 @@ def build_cluster_knowledge_graph(cluster_id, cluster_anomalies, rca_analyzer, o
         window_str: 时间窗口（如 0000_0030）
     """
     # 创建输出子目录
-    kg_output_dir = os.path.join(output_dir, f"knowledge_graphs", f"cluster_{cluster_id}")
+    kg_output_dir = os.path.join(output_dir, f"knowledge_graphs", f"{date_str}_{window_str}", f"cluster_{cluster_id}")
     os.makedirs(kg_output_dir, exist_ok=True)
     
     # 1. 初始化图谱节点和关系
@@ -963,11 +963,11 @@ def cluster_and_report(anomalies, output_file, dependency_graphs_path, date_str,
         f.write(f"- Component Weights: DB=1.0, OS=0.9, Docker/Pod=0.85\n")
         f.write(f"- Fault Types: CPU fault, network delay, network loss, db connection limit, db close\n")
         f.write(f"- Dependency Graph: Loaded from {dependency_graphs_path} ({rca_analyzer.global_topology.number_of_nodes()} nodes, {rca_analyzer.global_topology.number_of_edges()} edges)\n")
-        f.write(f"- Knowledge Graphs: Generated in {os.path.join(os.path.dirname(output_file), 'knowledge_graphs')}\n")
+        f.write(f"- Knowledge Graphs: Generated in {os.path.join(os.path.dirname(output_file), 'knowledge_graphs', f'{date_str}_{window_str}')}\n")
 
     print(f"✅ Report saved to: {output_file}")
     print(f"📊 Found {len(cluster_ids)} clusters and {len(noise)} isolated anomalies.")
-    print(f"📈 Knowledge graphs saved to: {os.path.join(os.path.dirname(output_file), 'knowledge_graphs')}")
+    print(f"📈 Knowledge graphs saved to: {os.path.join(os.path.dirname(output_file), 'knowledge_graphs', f'{date_str}_{window_str}')}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cluster anomalies with topology-based RCA for Telecom dataset.")

@@ -2,6 +2,7 @@ import json
 import os
 import numpy as np
 import requests
+import argparse
 from collections import defaultdict, Counter
 from datetime import datetime
 
@@ -35,6 +36,7 @@ class ProgrammaticRCAAnalyzer:
         # Core analysis results
         self.entity_scores = {}  # Entity root cause scores
         self.root_causes = []    # Sorted root cause results
+        self.analysis_summary = {}  # For final summary
     
     def _load_kg_data(self):
         """Load knowledge graph JSON data"""
@@ -235,24 +237,58 @@ class ProgrammaticRCAAnalyzer:
         report.append(f"3. Verify {primary_cause['neighbor_count']} associated entities of {primary_cause['entity_id']} for cascading failures")
         report.append(f"4. Monitor anomaly frequency and recovery status of {primary_cause['entity_id']}")
         
-        return "\n".join(report)
+        # 6. Generate analysis summary for final JSON
+        self.analysis_summary = {
+            "cluster_id": self.cluster_id,
+            "analysis_time": datetime.now().isoformat(),
+            "total_anomalies": self.total_anomalies,
+            "primary_root_cause": self.root_causes[0] if self.root_causes else {},
+            "top_5_root_causes": self.root_causes[:5],
+            "fault_type_distribution": dict(fault_counter),
+            "score_weights": SCORE_WEIGHTS
+        }
+        
+        return "\n".join(report), self.analysis_summary
 
-def run_programmatic_analysis(kg_dir):
-    """Run programmatic root cause analysis in batch"""
+def run_programmatic_analysis(kg_dir, summary_output_path):
+    """Run programmatic root cause analysis in batch with summary"""
+    programmatic_summary = {
+        "analysis_metadata": {
+            "analysis_time": datetime.now().isoformat(),
+            "score_weights": SCORE_WEIGHTS,
+            "component_base_weights": COMPONENT_BASE_WEIGHT
+        },
+        "clusters": {}
+    }
+    
     for root, dirs, files in os.walk(kg_dir):
         for file in files:
             if file.endswith("_kg.json"):
                 kg_path = os.path.join(root, file)
                 try:
                     analyzer = ProgrammaticRCAAnalyzer(kg_path)
-                    report = analyzer.generate_rca_report()
-                    # Save report
+                    report, cluster_summary = analyzer.generate_rca_report()
+                    
+                    # Extract cluster name from path
+                    cluster_name = os.path.basename(os.path.dirname(kg_path))
+                    # Save individual report
                     report_path = kg_path.replace("_kg.json", "_programmatic_rca_report.md")
                     with open(report_path, 'w', encoding='utf-8') as f:
                         f.write(report)
                     print(f"✅ Programmatic RCA report generated: {report_path}")
+                    
+                    # Add to summary
+                    programmatic_summary["clusters"][cluster_name] = cluster_summary
+                    
                 except Exception as e:
                     print(f"❌ Analysis failed for {kg_path}: {e}")
+    
+    # Save summary JSON
+    with open(summary_output_path, 'w', encoding='utf-8') as f:
+        json.dump(programmatic_summary, f, ensure_ascii=False, indent=2)
+    print(f"✅ Programmatic RCA summary saved to: {summary_output_path}")
+    
+    return programmatic_summary
 
 # ====================== LLM-driven RCA Analyzer ======================
 # LLM configuration (GLM-4.7)
@@ -275,6 +311,7 @@ class LLMbasedRCAAnalyzer:
         self.llm_response_dict = None  # Use dict instead of Completion object
         self.llm_raw_content = None    # Store only the content
         self.rca_report = None
+        self.analysis_summary = {}  # For final summary
     
     def _load_kg_data(self):
         """Load knowledge graph data"""
@@ -447,7 +484,18 @@ class LLMbasedRCAAnalyzer:
         report.append(llm_output)
         
         self.rca_report = "\n".join(report)
-        return self.rca_report
+        
+        # 4. Generate analysis summary for final JSON
+        self.analysis_summary = {
+            "cluster_id": self.cluster_id,
+            "analysis_time": datetime.now().isoformat(),
+            "model_used": self.llm_config['model'],
+            "total_anomalies": self.total_anomalies,
+            "llm_response_content": llm_output,
+            "token_usage": self.llm_response_dict['usage'] if self.llm_response_dict else {}
+        }
+        
+        return self.rca_report, self.analysis_summary
     
     def save_report(self):
         """Save analysis report with serializable data"""
@@ -476,10 +524,20 @@ class LLMbasedRCAAnalyzer:
         print(f"✅ LLM-driven RCA report generated: {report_path}")
         return report_path
 
-def run_llm_analysis(kg_dir, api_key):
-    """Run LLM-driven root cause analysis in batch"""
+def run_llm_analysis(kg_dir, api_key, summary_output_path):
+    """Run LLM-driven root cause analysis in batch with summary"""
     llm_config = LLM_CONFIG.copy()
     llm_config["api_key"] = api_key
+    
+    llm_summary = {
+        "analysis_metadata": {
+            "analysis_time": datetime.now().isoformat(),
+            "model_used": llm_config['model'],
+            "temperature": llm_config['temperature'],
+            "max_tokens": llm_config['max_tokens']
+        },
+        "clusters": {}
+    }
     
     for root, dirs, files in os.walk(kg_dir):
         for file in files:
@@ -487,27 +545,59 @@ def run_llm_analysis(kg_dir, api_key):
                 kg_path = os.path.join(root, file)
                 try:
                     analyzer = LLMbasedRCAAnalyzer(kg_path, llm_config)
-                    analyzer.generate_rca_report()
+                    report, cluster_summary = analyzer.generate_rca_report()
                     analyzer.save_report()
+                    
+                    # Extract cluster name from path
+                    cluster_name = os.path.basename(os.path.dirname(kg_path))
+                    # Add to summary
+                    llm_summary["clusters"][cluster_name] = cluster_summary
+                    
                 except Exception as e:
                     print(f"❌ Analysis failed for {kg_path}: {e}")
+    
+    # Save summary JSON
+    with open(summary_output_path, 'w', encoding='utf-8') as f:
+        json.dump(llm_summary, f, ensure_ascii=False, indent=2)
+    print(f"✅ LLM-driven RCA summary saved to: {summary_output_path}")
+    
+    return llm_summary
 
-# ====================== Usage Examples ======================
+# ====================== Main Execution with CLI Args ======================
+def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Cluster anomalies in a specific half-hour window of Telecom dataset.")
+    parser.add_argument("--date_online", required=True, help="Date string like 2020_04_11")
+    parser.add_argument("--output_suffix", required=True, help="Time window like 0000_0030")
+    parser.add_argument("--output_folder_name", type=str, default="1216",
+                        help="Output folder name (e.g., experiment ID)")
+    args = parser.parse_args()
+    
+    # Base paths
+    base_dir = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{args.output_folder_name}"
+    kg_root_dir = f"{base_dir}/knowledge_graphs/{args.date_online}_{args.output_suffix}"
+    
+    # Summary output paths
+    programmatic_summary_path = f"{base_dir}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_programmatic_rca_summary.json"
+    llm_summary_path = f"{base_dir}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_llm_rca_summary.json"
+    
+    # Validate input directory
+    if not os.path.exists(kg_root_dir):
+        print(f"❌ Error: Knowledge graph directory not found - {kg_root_dir}")
+        return
+    
+    # 1. Run programmatic analysis
+    print("\n=== Starting Programmatic RCA Analysis ===")
+    run_programmatic_analysis(kg_root_dir, programmatic_summary_path)
+    
+    # 2. Run LLM-driven analysis
+    print("\n=== Starting LLM-driven RCA Analysis ===")
+    api_key = "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa"  # Can also make this a CLI arg if needed
+    run_llm_analysis(kg_root_dir, api_key, llm_summary_path)
+    
+    print("\n✅ All analyses completed successfully!")
+    print(f"📊 Programmatic summary: {programmatic_summary_path}")
+    print(f"📊 LLM summary: {llm_summary_path}")
+
 if __name__ == "__main__":
-    # Example 1: Programmatic analysis (single cluster)
-    analyzer = ProgrammaticRCAAnalyzer("/root/shared-nvme/work/timeSeries/OmniTransfer_new/1216/knowledge_graphs/cluster_1/cluster_1_kg.json")
-    report = analyzer.generate_rca_report()
-    print(report)
-    
-    # Example 2: Batch programmatic analysis
-    run_programmatic_analysis("/root/shared-nvme/work/timeSeries/OmniTransfer_new/1216/knowledge_graphs")
-    
-    # Example 3: LLM-driven analysis (single cluster)
-    llm_config = LLM_CONFIG.copy()
-    llm_config["api_key"] = "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa"
-    analyzer = LLMbasedRCAAnalyzer("/root/shared-nvme/work/timeSeries/OmniTransfer_new/1216/knowledge_graphs/cluster_1/cluster_1_kg.json", llm_config)
-    analyzer.generate_rca_report()
-    analyzer.save_report()
-    
-    # Example 4: Batch LLM-driven analysis
-    run_llm_analysis("/root/shared-nvme/work/timeSeries/OmniTransfer_new/1216/knowledge_graphs", "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa")
+    main()
