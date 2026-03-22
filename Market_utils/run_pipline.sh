@@ -1,5 +1,5 @@
 #！/bin/bash
-# nohup bash run_pipline.sh >> run_pipline_log_9.log 2>&1 &
+# nohup bash run_pipline.sh >> run_pipline_log_12.log 2>&1 &
 
 # python 9.run_pipline_Market_metric.py \
 #   --date_offline 2022_03_20 \
@@ -32,10 +32,15 @@
 
 # python -u 16.run_all_commands.py
 
-python 15.Market_cluster_window_analyze_anomalies_3.3.py \
+# python 15.Market_cluster_window_analyze_anomalies_3.13.py \
+#   --date_online 2022_03_20 \
+#   --eps 60 \
+#   --min_samples 3 \
+#   --output_folder_name 1215 \
+#   --output_suffix 0830_0900
+
+python 17.Market_knowledge_graph_RCA.3.20.py \
   --date_online 2022_03_20 \
-  --eps 60 \
-  --min_samples 3 \
   --output_folder_name 1215 \
   --output_suffix 0830_0900
 
