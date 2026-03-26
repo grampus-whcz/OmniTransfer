@@ -1094,8 +1094,8 @@ def main():
     os.makedirs(base_dir, exist_ok=True)
     
     # Define output paths
-    programmatic_summary_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_programmatic_rca_summary_enhanced.json"
-    llm_summary_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_llm_rca_summary_enhanced.json"
+    programmatic_summary_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_programmatic_rca_summary.json"
+    llm_summary_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_llm_rca_summary.json"
     merged_summary_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_merged_rca_summary.json"
     evaluation_path = f"{base_dir}/Bank_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_rca_evaluation.json"
     
