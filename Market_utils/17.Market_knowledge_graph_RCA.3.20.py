@@ -55,6 +55,15 @@ LLM_CONFIG = {
     "max_retries": 3           # NEW: retry mechanism
 }
 
+# LLM_CONFIG = {
+#     "model": "deepseek-r1-0528",
+#     "api_key": "sk-e8bbbd81c0dc42dfa73d557012d1a3dd",
+#     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+#     "temperature": 0.4,        # Lower temperature for more stable results
+#     "max_tokens": 8192,
+#     "max_retries": 3           # New: maximum retry attempts
+# }
+
 # Market timezone configuration
 BEIJING_TZ = timezone(timedelta(hours=8))
 
@@ -493,7 +502,7 @@ def run_programmatic_analysis(kg_dir, summary_output_path):
             "score_weights": SCORE_WEIGHTS,
             "component_base_weights": COMPONENT_BASE_WEIGHT,
             "severity_weights": ANOMALY_SEVERITY_WEIGHT,
-            "analysis_type": "Market_microservice_programmatic_rca_enhanced"
+            "analysis_type": "Market_microservice_programmatic_rca"
         },
         "clusters": {}
     }
@@ -512,7 +521,7 @@ def run_programmatic_analysis(kg_dir, summary_output_path):
                     # Extract cluster name
                     cluster_name = os.path.basename(os.path.dirname(kg_path))
                     # Save individual report
-                    report_path = kg_path.replace("_kg.json", "_programmatic_rca_report_enhanced.md")
+                    report_path = kg_path.replace("_kg.json", "_programmatic_rca_report.md")
                     with open(report_path, 'w', encoding='utf-8') as f:
                         f.write(report)
                     print(f"✅ Programmatic RCA report generated: {report_path}")
@@ -752,69 +761,128 @@ Step 5: Root Cause Confirmation - Provide ranked root causes with confidence sco
         return "\n".join(prompt)
     
     def _call_llm_api(self, prompt):
-        """Enhanced GLM API call with retry mechanism"""
-        # Initialize GLM client
-        client = ZhipuAI(
-            api_key=self.llm_config['api_key'],
-            base_url=self.llm_config.get('api_base', 'https://open.bigmodel.cn/api/coding/paas/v4')
-        )
-        
-        # Build enhanced messages
+                
+        # Build messages
         messages = [
-            {"role": "system", "content": "You are a Market microservice fault root cause analysis expert, proficient in fault analysis of nginx→gateway→SpringBoot→MQ→K8S→ES/Memcached architecture."},
+            {"role": "system", "content": "You are a Bank microservice fault root cause analysis expert, proficient in fault analysis of apache→IG→Tomcat→MG→docker→mysql/redis architecture."},
             {"role": "user", "content": prompt}
         ]
+        # Get configuration parameters
+        temperature = self.llm_config.get('temperature', 0.4)
+        max_output_tokens = self.llm_config.get('max_tokens', 8192)
         
-        # API call with retry (NEW)
+        # API call with retry
         max_retries = self.llm_config.get("max_retries", 3)
-        for retry in range(max_retries):
-            try:
-                # Get configuration parameters
-                temperature = self.llm_config.get('temperature', 0.4)
-                max_output_tokens = self.llm_config.get('max_tokens', 8192)
+        
+        if "glm" in self.llm_config['model']:
+            
+            print("Calling GLM API...")
+                    
+            """Call GLM-4.7 API (enhanced version with retry)"""
+            # Initialize GLM client
+            client = ZhipuAI(
+                api_key=self.llm_config['api_key'],
+                base_url=self.llm_config.get('api_base', 'https://open.bigmodel.cn/api/coding/paas/v4')
+            )
+            
+            for retry in range(max_retries):
+                try:
+                    # Call GLM API
+                    full_response = client.chat.completions.create(
+                        model=self.llm_config['model'],
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_output_tokens,
+                        top_p=0.95
+                    )
+                    
+                    # Extract response content
+                    response_content = full_response.choices[0].message.content
+                    self.llm_raw_content = response_content
+                    
+                    # Convert to serializable dictionary
+                    self.llm_response_dict = {
+                        "model": self.llm_config['model'],
+                        "content": response_content,
+                        "usage": {
+                            "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
+                            "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
+                            "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
+                        },
+                        "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                        "temperature": temperature
+                    }
+                    
+                    # Print token usage
+                    total_tokens = self.llm_response_dict['usage']['total_tokens']
+                    print(f"✅ LLM API call successful - Cluster {self.cluster_id} (Tokens: {total_tokens})")
+                    
+                    # Token limit warning
+                    if total_tokens > 120000:
+                        print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
+                    
+                    return response_content
+                    
+                except Exception as e:
+                    if retry == max_retries - 1:
+                        raise RuntimeError(f"GLM API call failed (after {max_retries} retries): {e}")
+                    wait_time = 2 ** retry  # Exponential backoff
+                    print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
+                    time.sleep(wait_time)
+                    
+        elif "deepseek" in self.llm_config['model'] or "qwen" in self.llm_config['model']:
+            
+            print(f"Calling {self.llm_config['model']} API...")
+            
+            from openai import OpenAI
+    
+            client = OpenAI(
+                api_key=self.llm_config['api_key'],
+                base_url=self.llm_config['api_base']
+            )
+            
+            for retry in range(max_retries):
+                try:
+            
+                    full_response = client.chat.completions.create(
+                        model = self.llm_config['model'],
+                        messages = messages,
+                        temperature = temperature,
+                    )
+                    
+                    response_content = full_response.choices[0].message.content
+                    
+                    self.llm_raw_content = response_content
+                            
+                    # Convert to serializable dictionary
+                    self.llm_response_dict = {
+                        "model": self.llm_config['model'],
+                        "content": response_content,
+                        "usage": {
+                            "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
+                            "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
+                            "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
+                        },
+                        "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                        "temperature": temperature
+                    }
+                    
+                    # Print token usage
+                    total_tokens = self.llm_response_dict['usage']['total_tokens']
+                    print(f"✅ LLM API call successful - Cluster {self.cluster_id} (Tokens: {total_tokens})")
+                    
+                    # Token limit warning
+                    if total_tokens > 120000:
+                        print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
+                    
+                    return response_content
                 
-                # Call GLM API
-                full_response = client.chat.completions.create(
-                    model=self.llm_config['model'],
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_output_tokens,
-                    top_p=0.95
-                )
-                
-                # Extract response content
-                response_content = full_response.choices[0].message.content
-                self.llm_raw_content = response_content
-                
-                # Convert to serializable dictionary
-                self.llm_response_dict = {
-                    "model": self.llm_config['model'],
-                    "content": response_content,
-                    "usage": {
-                        "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
-                        "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
-                        "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
-                    },
-                    "created_at": datetime.now(BEIJING_TZ).isoformat(),
-                    "temperature": temperature
-                }
-                
-                # Print token usage
-                total_tokens = self.llm_response_dict['usage']['total_tokens']
-                print(f"✅ LLM API call successful - Cluster {self.cluster_id} (Tokens: {total_tokens})")
-                
-                # Token limit warning
-                if total_tokens > 120000:
-                    print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
-                
-                return response_content
-                
-            except Exception as e:
-                if retry == max_retries - 1:
-                    raise RuntimeError(f"GLM API call failed (after {max_retries} retries): {e}")
-                wait_time = 2 ** retry  # Exponential backoff
-                print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
-                time.sleep(wait_time)
+                except Exception as e:
+                    if retry == max_retries - 1:
+                        raise RuntimeError(f"{self.llm_config['model']} API call failed (after {max_retries} retries): {e}")
+                    wait_time = 2 ** retry  # Exponential backoff
+                    print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
+                    time.sleep(wait_time)
     
     def generate_rca_report(self):
         """Generate enhanced LLM-driven Market RCA report"""
@@ -858,7 +926,7 @@ Step 5: Root Cause Confirmation - Provide ranked root causes with confidence sco
             raise ValueError("Please generate analysis report first")
         
         # Save main report
-        report_path = self.kg_json_path.replace("_kg.json", "_llm_rca_report_enhanced.md")
+        report_path = self.kg_json_path.replace("_kg.json", "_llm_rca_report.md")
         try:
             with open(report_path, 'w', encoding='utf-8') as f:
                 f.write(self.rca_report)
@@ -867,14 +935,14 @@ Step 5: Root Cause Confirmation - Provide ranked root causes with confidence sco
         
         # Save LLM response
         if self.llm_response_dict:
-            response_path = self.kg_json_path.replace("_kg.json", "_llm_response_enhanced.json")
+            response_path = self.kg_json_path.replace("_kg.json", "_llm_response.json")
             try:
                 with open(response_path, 'w', encoding='utf-8') as f:
                     json.dump(self.llm_response_dict, f, ensure_ascii=False, indent=2)
             except Exception as e:
                 print(f"⚠️ Failed to save LLM response JSON: {e}")
                 # Fallback to save raw content
-                fallback_path = self.kg_json_path.replace("_kg.json", "_llm_response_raw_enhanced.txt")
+                fallback_path = self.kg_json_path.replace("_kg.json", "_llm_response_raw.txt")
                 with open(fallback_path, 'w', encoding='utf-8') as f:
                     f.write(self.llm_raw_content or "No response content")
         
@@ -893,7 +961,7 @@ def run_llm_analysis(kg_dir, api_key, summary_output_path):
             "temperature": llm_config['temperature'],
             "max_tokens": llm_config['max_tokens'],
             "max_retries": llm_config['max_retries'],
-            "analysis_type": "Market_microservice_llm_rca_enhanced"
+            "analysis_type": "Market_microservice_llm_rca"
         },
         "clusters": {}
     }

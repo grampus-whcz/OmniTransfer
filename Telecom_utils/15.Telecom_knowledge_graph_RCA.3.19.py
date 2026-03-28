@@ -7,7 +7,7 @@ import numpy as np
 import requests
 import argparse
 from collections import defaultdict, Counter
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # virtual environment: conda faiss-env
 
@@ -46,6 +46,17 @@ LLM_CONFIG = {
     "max_tokens": 8192,     # Maximum output length
     "max_retries": 3        # API retry count
 }
+
+# LLM_CONFIG = {
+#     "model": "deepseek-r1-0528",
+#     "api_key": "sk-e8bbbd81c0dc42dfa73d557012d1a3dd",
+#     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+#     "temperature": 0.4,        # Lower temperature for more stable results
+#     "max_tokens": 8192,
+#     "max_retries": 3           # New: maximum retry attempts
+# }
+
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 # ====================== Programmatic RCA Analyzer ======================
 class ProgrammaticRCAAnalyzer:
@@ -559,71 +570,128 @@ Step 5: Root Cause Confirmation - Rank root causes with confidence score (0-1) a
         return "\n".join(prompt)
     
     def _call_llm_api(self, prompt):
-        """Call GLM-4.7 LLM API with retry mechanism and serializable response"""
-        from zhipuai import ZhipuAI
-        
-        # Initialize GLM client
-        client = ZhipuAI(
-            api_key=self.llm_config['api_key'],
-            base_url=self.llm_config.get('api_base', 'https://open.bigmodel.cn/api/coding/paas/v4')
-        )
-        
+                
         # Build messages
         messages = [
-            {"role": "system", "content": "You are an expert in microservice fault root cause analysis, skilled at analyzing root causes based on knowledge graphs."},
+            {"role": "system", "content": "You are a Bank microservice fault root cause analysis expert, proficient in fault analysis of apache→IG→Tomcat→MG→docker→mysql/redis architecture."},
             {"role": "user", "content": prompt}
         ]
+        # Get configuration parameters
+        temperature = self.llm_config.get('temperature', 0.4)
+        max_output_tokens = self.llm_config.get('max_tokens', 8192)
         
-        # API call with retries
+        # API call with retry
         max_retries = self.llm_config.get("max_retries", 3)
-        for retry in range(max_retries):
-            try:
-                # Get configuration parameters
-                temperature = self.llm_config.get('temperature', 0.4)
-                max_output_tokens = self.llm_config.get('max_tokens', 8192)
+        
+        if "glm" in self.llm_config['model']:
+            
+            print("Calling GLM API...")
+                    
+            """Call GLM-4.7 API (enhanced version with retry)"""
+            # Initialize GLM client
+            client = ZhipuAI(
+                api_key=self.llm_config['api_key'],
+                base_url=self.llm_config.get('api_base', 'https://open.bigmodel.cn/api/coding/paas/v4')
+            )
+            
+            for retry in range(max_retries):
+                try:
+                    # Call GLM API
+                    full_response = client.chat.completions.create(
+                        model=self.llm_config['model'],
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_output_tokens,
+                        top_p=0.95
+                    )
+                    
+                    # Extract response content
+                    response_content = full_response.choices[0].message.content
+                    self.llm_raw_content = response_content
+                    
+                    # Convert to serializable dictionary
+                    self.llm_response_dict = {
+                        "model": self.llm_config['model'],
+                        "content": response_content,
+                        "usage": {
+                            "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
+                            "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
+                            "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
+                        },
+                        "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                        "temperature": temperature
+                    }
+                    
+                    # Print token usage
+                    total_tokens = self.llm_response_dict['usage']['total_tokens']
+                    print(f"✅ LLM API call successful - Cluster {self.cluster_id} (Tokens: {total_tokens})")
+                    
+                    # Token limit warning
+                    if total_tokens > 120000:
+                        print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
+                    
+                    return response_content
+                    
+                except Exception as e:
+                    if retry == max_retries - 1:
+                        raise RuntimeError(f"GLM API call failed (after {max_retries} retries): {e}")
+                    wait_time = 2 ** retry  # Exponential backoff
+                    print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
+                    time.sleep(wait_time)
+                    
+        elif "deepseek" in self.llm_config['model'] or "qwen" in self.llm_config['model']:
+            
+            print(f"Calling {self.llm_config['model']} API...")
+            
+            from openai import OpenAI
+    
+            client = OpenAI(
+                api_key=self.llm_config['api_key'],
+                base_url=self.llm_config['api_base']
+            )
+            
+            for retry in range(max_retries):
+                try:
+            
+                    full_response = client.chat.completions.create(
+                        model = self.llm_config['model'],
+                        messages = messages,
+                        temperature = temperature,
+                    )
+                    
+                    response_content = full_response.choices[0].message.content
+                    
+                    self.llm_raw_content = response_content
+                            
+                    # Convert to serializable dictionary
+                    self.llm_response_dict = {
+                        "model": self.llm_config['model'],
+                        "content": response_content,
+                        "usage": {
+                            "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
+                            "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
+                            "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
+                        },
+                        "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                        "temperature": temperature
+                    }
+                    
+                    # Print token usage
+                    total_tokens = self.llm_response_dict['usage']['total_tokens']
+                    print(f"✅ LLM API call successful - Cluster {self.cluster_id} (Tokens: {total_tokens})")
+                    
+                    # Token limit warning
+                    if total_tokens > 120000:
+                        print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
+                    
+                    return response_content
                 
-                # Call GLM API
-                full_response = client.chat.completions.create(
-                    model=self.llm_config['model'],
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_output_tokens,
-                    top_p=0.95
-                )
-                
-                # Extract response content
-                response_content = full_response.choices[0].message.content
-                self.llm_raw_content = response_content
-                
-                # Convert to serializable dict
-                self.llm_response_dict = {
-                    "model": self.llm_config['model'],
-                    "content": response_content,
-                    "usage": {
-                        "prompt_tokens": getattr(full_response.usage, 'prompt_tokens', 0),
-                        "completion_tokens": getattr(full_response.usage, 'completion_tokens', 0),
-                        "total_tokens": getattr(full_response.usage, 'total_tokens', 0)
-                    },
-                    "created_at": datetime.now().isoformat(),
-                    "temperature": temperature
-                }
-                
-                # Print token usage
-                total_tokens = self.llm_response_dict['usage']['total_tokens']
-                print(f"✅ LLM API call succeeded - Cluster {self.cluster_id} (Tokens: {total_tokens})")
-                
-                # Warning for token limit
-                if total_tokens > 120000:
-                    print(f"⚠️ Warning: Token usage ({total_tokens}) approaching 128K limit")
-                
-                return response_content
-                
-            except Exception as e:
-                if retry == max_retries - 1:
-                    raise RuntimeError(f"GLM API call failed after {max_retries} retries: {e}")
-                wait_time = 2 ** retry  # Exponential backoff
-                print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time}s: {e}")
-                time.sleep(wait_time)
+                except Exception as e:
+                    if retry == max_retries - 1:
+                        raise RuntimeError(f"{self.llm_config['model']} API call failed (after {max_retries} retries): {e}")
+                    wait_time = 2 ** retry  # Exponential backoff
+                    print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
+                    time.sleep(wait_time)
     
     def generate_rca_report(self):
         """Generate enhanced LLM-driven root cause analysis report"""
