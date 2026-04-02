@@ -145,7 +145,7 @@ top10_entities_stack.plot(
 )
 ax_stack.set_xlabel('Entity', fontsize=11)
 ax_stack.set_ylabel('Anomaly Count', fontsize=11)
-ax_stack.set_title('(a) Anomaly Type Distribution of Top10 Entities', fontsize=12, fontweight='bold')
+ax_stack.set_title('① Anomaly Type Distribution of Top10 Entities', fontsize=15, fontweight='bold')
 ax_stack.legend(
     fontsize=8,
     loc='upper right',
@@ -163,7 +163,7 @@ wedges, texts, autotexts = ax_pie.pie(
     colors=colors[:len(anomaly_type_count)],
     startangle=90
 )
-ax_pie.set_title('(b) Anomaly Type Distribution', fontsize=12, fontweight='bold')
+ax_pie.set_title('② Anomaly Type Distribution', fontsize=15, fontweight='bold')
 for autotext in autotexts:
     autotext.set_color('white')
     autotext.set_fontweight('bold')
@@ -189,7 +189,7 @@ for i, col in enumerate(time_distribution.columns):
 
 ax_time.set_xlabel('Time (Minute)', fontsize=11)
 ax_time.set_ylabel('Anomaly Count', fontsize=11)
-ax_time.set_title('(c) Anomaly Time Distribution (Per Minute)', fontsize=12, fontweight='bold')
+ax_time.set_title('③ Anomaly Time Distribution (Per Minute)', fontsize=15, fontweight='bold')
 
 # 图例向右移动，避免遮挡线条
 ax_time.legend(fontsize=9, loc='upper left', bbox_to_anchor=(0.8, 0.98), borderaxespad=0.)

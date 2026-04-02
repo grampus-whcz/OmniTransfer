@@ -46,23 +46,23 @@ ANOMALY_SEVERITY_WEIGHT = {
 }
 
 # LLM Configuration (enhanced GLM-4.7 settings)
-LLM_CONFIG = {
-    "model": "glm-4.7",
-    "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
-    "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
-    "temperature": 0.4,        # Lower for more stable results
-    "max_tokens": 8192,
-    "max_retries": 3           # NEW: retry mechanism
-}
-
 # LLM_CONFIG = {
-#     "model": "deepseek-r1-0528",
-#     "api_key": "sk-e8bbbd81c0dc42dfa73d557012d1a3dd",
-#     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-#     "temperature": 0.4,        # Lower temperature for more stable results
+#     "model": "glm-4.7",
+#     "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
+#     "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+#     "temperature": 0.4,        # Lower for more stable results
 #     "max_tokens": 8192,
-#     "max_retries": 3           # New: maximum retry attempts
+#     "max_retries": 3           # NEW: retry mechanism
 # }
+
+LLM_CONFIG = {
+    "model": "deepseek-r1-0528",
+    "api_key": "sk-e8bbbd81c0dc42dfa73d557012d1a3dd",
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "temperature": 0.4,        # Lower temperature for more stable results
+    "max_tokens": 8192,
+    "max_retries": 3           # New: maximum retry attempts
+}
 
 # Market timezone configuration
 BEIJING_TZ = timezone(timedelta(hours=8))
@@ -833,6 +833,8 @@ Step 5: Root Cause Confirmation - Provide ranked root causes with confidence sco
         elif "deepseek" in self.llm_config['model'] or "qwen" in self.llm_config['model']:
             
             print(f"Calling {self.llm_config['model']} API...")
+            print(f"LLM Configuration: Model={self.llm_config['model']}, Temperature={temperature}, Max Tokens={max_output_tokens}, key={self.llm_config['api_key']}, url={self.llm_config['api_base']}")
+            
             
             from openai import OpenAI
     
@@ -952,7 +954,7 @@ Step 5: Root Cause Confirmation - Provide ranked root causes with confidence sco
 def run_llm_analysis(kg_dir, api_key, summary_output_path):
     """Enhanced batch LLM-driven analysis with progress tracking"""
     llm_config = LLM_CONFIG.copy()
-    llm_config["api_key"] = api_key
+    # llm_config["api_key"] = api_key
     
     llm_summary = {
         "analysis_metadata": {

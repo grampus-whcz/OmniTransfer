@@ -9,3 +9,15 @@ Bank_cluster_window_analyze_anomalies.py的老版本，只根据npy做聚类
 
 # 4.run_all_analyses
 对1204中已生成的npy进行聚类和PyRCA根因初步分析
+
+# Bank_cluster_window_analyze_anomalies_2.1.py
+# Bank_cluster_window_analyze_anomalies_2.7.py
+简易版的图推理RCA版本
+
+# Bank_cluster_window_analyze_anomalies_2.7.py
+ClusTopoRCA 版本
+
+# Bank_cluster_window_analyze_anomalies_3.13.py
+# Bank_knowledge_graph_RCA.3.20.py
+知识图谱 版本
+

@@ -3,25 +3,28 @@ import numpy as np
 
 # ---------------------- 1. 数据准备 ----------------------
 groups = [r'$Easy$', r'$Mid$', r'$Hard$']
-models = ['M', 'M1', 'M2']
-new_legend_names = ['$ClusterRCA$', '$ClusterRCA_{w/o\ LLM-inferred\ log\ context}$', '$ClusterRCA_{w\ raw\ log\ context}$']
+models = ['M', 'M1', 'M2', 'M3']
+new_legend_names = ['$TRAC\\text{-}RCA$', '$TRAC\\text{-}RCA_{w/o\ open\ corpus}$', '$TRAC\\text{-}RCA_{w/o\ private\ corpus}$', '$TRAC\\text{-}RCA_{w/o\ both\ corpus}$']
 
 deepseek_data = {
     'M': [0.2609, 0.4583, 0.6667],
-    'M1': [0.2309, 0.4167, 0.5833],
-    'M2': [0.1773, 0.3583, 0.5133]
+    'M1': [0.2609, 0.4167, 0.5833],
+    'M2': [0.2173, 0.4583, 0.5833],
+    'M3': [0.2173, 0.3958, 0.5833]
 }
 
 gpt_data = {
-    'M': [0.2876, 0.4779, 0.6993],
+    'M': [0.2609, 0.4583, 0.6667],
     'M1': [0.2609, 0.4167, 0.5833],
-    'M2': [0.1973, 0.3383, 0.4633]
+    'M2': [0.2173, 0.4583, 0.5833],
+    'M3': [0.2173, 0.3958, 0.5833]
 }
 
 styles = {
     'M': {'hatch': '///', 'color': 'white', 'edgecolor': 'black'},
     'M1': {'hatch': '...', 'color': 'white', 'edgecolor': 'black'},
-    'M2': {'hatch': 'xxx', 'color': 'white', 'edgecolor': 'black'}
+    'M2': {'hatch': 'xxx', 'color': 'white', 'edgecolor': 'black'},
+    'M3': {'hatch': '|||', 'color': 'white', 'edgecolor': 'black'}
 }
 
 bar_width = 0.15

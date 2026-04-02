@@ -141,7 +141,7 @@ def plot_boxplot(gpt4o_df, deepseek_df):
     
     # ---------------------- 全局图例 ----------------------
     handles = [
-        plt.Line2D([0], [0], color=PALETTE['Original'], lw=3, label='RAGFreeRCA', alpha=0.8),
+        plt.Line2D([0], [0], color=PALETTE['Original'], lw=3, label='TRAC-RCA', alpha=0.8),
         plt.Line2D([0], [0], color=PALETTE['OpenRCA'], lw=3, label='OpenRCA', alpha=0.8)
     ]
     fig.legend(

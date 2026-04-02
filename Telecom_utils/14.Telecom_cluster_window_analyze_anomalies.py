@@ -270,7 +270,7 @@ if __name__ == "__main__":
     BASE_DIR = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{args.output_folder_name}"
 
     print(f"📁 Loading anomalies for date={args.date_online}, window={args.output_suffix}")
-    anomalies = load_anomalies_from_window_new(BASE_DIR, args.date_online, args.output_suffix)
+    anomalies = load_anomalies_from_window(BASE_DIR, args.date_online, args.output_suffix)
     
     output_file = f"{BASE_DIR}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}.txt"
 
