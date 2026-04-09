@@ -8,15 +8,103 @@ from datetime import datetime, timezone, timedelta
 import argparse
 import re
 
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 4
+# ANOMALY_THRESHOLD = 2
+# FALLBACK_THRESHOLD = 1
+# WEIGHT_TIME = 0.3
+# WEIGHT_TOPOLOGY = 0.4
+# WEIGHT_COUNT = 0.3
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 2
+
+# # config 1: 3
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 1
+# FALLBACK_THRESHOLD = 1
+# WEIGHT_TIME = 0.3
+# WEIGHT_TOPOLOGY = 0.4
+# WEIGHT_COUNT = 0.3
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 1
+
+# config 2: 8
 # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
-CONCENTRATION_WINDOW_MINUTES = 4
-ANOMALY_THRESHOLD = 2
+CONCENTRATION_WINDOW_MINUTES = 5
+ANOMALY_THRESHOLD = 3
 FALLBACK_THRESHOLD = 1
-WEIGHT_TIME = 0.3
-WEIGHT_TOPOLOGY = 0.4
-WEIGHT_COUNT = 0.3
+WEIGHT_TIME = 0.1
+WEIGHT_TOPOLOGY = 0.8
+WEIGHT_COUNT = 0.1
 # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
-ANALYSIS_START_TIMESTAMP_INDEX = 2
+ANALYSIS_START_TIMESTAMP_INDEX = 0
+
+# # config 3: 6
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 6
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 2
+# WEIGHT_TIME = 0.1
+# WEIGHT_TOPOLOGY = 0.8
+# WEIGHT_COUNT = 0.1
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 0
+
+# # config 4: 5
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 1
+# WEIGHT_TIME = 0.1
+# WEIGHT_TOPOLOGY = 0.8
+# WEIGHT_COUNT = 0.1
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 2
+
+# # config 5: 6
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 1
+# WEIGHT_TIME = 0.05
+# WEIGHT_TOPOLOGY = 0.9
+# WEIGHT_COUNT = 0.05
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 0
+
+# # config 6: 6
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 2
+# WEIGHT_TIME = 0.15
+# WEIGHT_TOPOLOGY = 0.7
+# WEIGHT_COUNT = 0.15
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 0
+
+# # config 7: 6
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 1
+# WEIGHT_TIME = 0.15
+# WEIGHT_TOPOLOGY = 0.7
+# WEIGHT_COUNT = 0.15
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 0
+
+# # config 8:
+# # === 全局配置（复用Bank的RCA权重体系，适配Market调整）===
+# CONCENTRATION_WINDOW_MINUTES = 5
+# ANOMALY_THRESHOLD = 3
+# FALLBACK_THRESHOLD = 2
+# WEIGHT_TIME = 0.1
+# WEIGHT_TOPOLOGY = 0.8
+# WEIGHT_COUNT = 0.1
+# # 新增超参数：分析起点的时间戳索引（0=T0(最早),1=T1(第二早),2=T2(第三早)）
+# ANALYSIS_START_TIMESTAMP_INDEX = 0
 
 # 北京时区 (UTC+8)
 try:
@@ -1167,11 +1255,11 @@ if __name__ == "__main__":
         args=args
     )
     
-    # 生成精简版报告
-    condensed_output_file = f"{BASE_DIR}/Market_cluster_window_anomaly_short_report_{args.date_online}_{args.output_suffix}.txt"
-    cluster_and_report_condensed(
-        anomalies,
-        output_file=condensed_output_file,
-        eps_seconds=args.eps,
-        min_samples=args.min_samples
-    )
+    # # 生成精简版报告
+    # condensed_output_file = f"{BASE_DIR}/Market_cluster_window_anomaly_short_report_{args.date_online}_{args.output_suffix}.txt"
+    # cluster_and_report_condensed(
+    #     anomalies,
+    #     output_file=condensed_output_file,
+    #     eps_seconds=args.eps,
+    #     min_samples=args.min_samples
+    # )

@@ -1,7 +1,7 @@
 import csv
 
 # 文件路径
-file_path = "/root/shared-nvme/work/agent/OpenRCA_original/OpenRCA/experiments_original/Telecom/deepseek-r1-250528/Telecom_original_deepseek-r1-250528_task_summary.csv"
+file_path = "/root/shared-nvme/work/agent/OpenRCA/experiments/Market/deepseek-r1-0528/Market_cloudbed-2_no_RAG_c3_knowledge_graph_advanced_merged_hyperpara_config2_deepseek-r1-0528_task_summary.csv"
 
 # 存储 total_tokens 的列表
 total_tokens_list = []
