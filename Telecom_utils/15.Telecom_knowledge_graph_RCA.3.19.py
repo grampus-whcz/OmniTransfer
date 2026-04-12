@@ -8,6 +8,7 @@ import requests
 import argparse
 from collections import defaultdict, Counter
 from datetime import datetime, timezone, timedelta
+from zhipuai import ZhipuAI
 
 # virtual environment: conda faiss-env
 
