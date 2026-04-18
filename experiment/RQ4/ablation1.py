@@ -49,7 +49,7 @@ y_lim = (0.1, 0.75)
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
 
 # ---------------------- 4. 绘制 deepseek 子图 ----------------------
-ax1.set_ylabel('deepseek', rotation=0, labelpad=20, ha='center', va='center', fontsize=18)
+ax1.set_ylabel('deepseek-\nr1-0528', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
 ax1.set_ylim(y_lim)
 ax1.set_yticks(show_yticks)
 ax1.tick_params(axis='y', labelsize=12)
@@ -58,7 +58,7 @@ for i, model in enumerate(models):
             label=new_legend_names[i], **styles[model])
 
 # ---------------------- 5. 绘制 gpt-4o 子图 ----------------------
-ax2.set_ylabel('gpt-4o', rotation=0, labelpad=20, ha='center', va='center', fontsize=18)
+ax2.set_ylabel('GPT-4o', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
 ax2.set_ylim(y_lim)
 ax2.set_yticks(show_yticks)
 ax2.tick_params(axis='y', labelsize=12)
