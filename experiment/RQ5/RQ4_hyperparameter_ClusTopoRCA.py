@@ -79,7 +79,13 @@ handles = [
     plt.Line2D([], [], color='#C55A11', linestyle=':', marker='^', markersize=15, linewidth=1.5),
     plt.Line2D([], [], color='#66c274', linestyle='-.', marker='.', markersize=15, linewidth=1.5)
 ]
-labels = ['Correct', 'Partial', 'Total']
+# labels = ['CORRECT', 'PARTIAL', 'TOTAL']
+
+labels = [
+    r'$\mathbf{C}$ORRECT',
+    r'$\mathbf{P}$ARTIAL',
+    r'$\mathbf{T}$OTAL'
+]
 
 fig.legend(
     handles, labels,
