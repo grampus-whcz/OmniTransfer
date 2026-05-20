@@ -24,3 +24,5 @@ events.*
 /__pycache__
 /gdn_install_packages
 /gdn_install_packages_gpu
+!/requirements_gdn.txt
+!/requirements.txt
