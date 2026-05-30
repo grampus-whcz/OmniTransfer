@@ -7,18 +7,18 @@ models = ['M', 'M1', 'M2', 'M3']
 new_legend_names = ['$TRAC\\text{-}RCA$', '$TRAC\\text{-}RCA_{w/o\ open\ corpus}$', '$TRAC\\text{-}RCA_{w/o\ private\ corpus}$', '$TRAC\\text{-}RCA_{w/o\ both\ corpus}$']
 
 deepseek_data = {
-    'M': [0.2609, 0.4583, 0.6667],
-    'M1': [0.2609, 0.4167, 0.5833],
-    'M2': [0.2173, 0.4583, 0.5833],
-    'M3': [0.2173, 0.3958, 0.5833]
+    'M': [0.2609, 0.4583, 0.6667], # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/deepseek-r1-250528/Bank_all_RAG_k4_deepseek-r1-250528_difficulty_summary.csv
+    'M1': [0.2173, 0.4583, 0.5833], # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/deepseek-r1-250528/Bank_private_RAG_k4_deepseek-r1-250528_difficulty_summary.csv
+    'M2': [0.2609, 0.4167, 0.5833], # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/deepseek-r1-250528/Bank_public_RAG_k4_deepseek-r1-250528_difficulty_summary.csv
+    'M3': [0.2173, 0.3958, 0.5833] # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/deepseek-r1-250528/Bank_no_RAG_k4_deepseek-r1-250528_difficulty_summary.csv
 }
 
-gpt_data = {
-    'M': [0.2609, 0.4583, 0.6667],
-    'M1': [0.2609, 0.4167, 0.5833],
-    'M2': [0.2173, 0.4583, 0.5833],
-    'M3': [0.2173, 0.3958, 0.5833]
-}
+# gpt_data = {
+#     'M': [0.2174, 0.3542, 0.4167], # /root/shared-nvme/work/agent/TRAC-RCA/experiments/Bank/gpt-4o/Bank_all_RAG_gpt-4o_difficulty_summary.csv
+#     'M1': [0.2609, 0.4167, 0.5833],
+#     'M2': [0.2258, 0.4035, 0.5882], # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/gpt-4o/Bank_public_RAG_gpt-4o_difficulty_summary.csv
+#     'M3': [0.2258, 0.3509, 0.3529] # /root/shared-nvme/work/agent/TRAC-RCA/experiments/ablation/gpt-4o/Bank_no_RAG_gpt-4o_difficulty_summary.csv
+# }
 
 styles = {
     'M': {'hatch': '///', 'color': 'white', 'edgecolor': 'black'},
@@ -46,28 +46,32 @@ show_yticks = [0.2, 0.5, 0.7]
 y_lim = (0.1, 0.75)
 
 # ---------------------- 3. 绘图设置 ----------------------
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
+# fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
+fig, ax1 = plt.subplots(1, 1, figsize=(13, 6), sharex=True)
 
 # ---------------------- 4. 绘制 deepseek 子图 ----------------------
 ax1.set_ylabel('deepseek-\nr1-0528', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
 ax1.set_ylim(y_lim)
 ax1.set_yticks(show_yticks)
 ax1.tick_params(axis='y', labelsize=12)
+ax1.set_xticks(x + (len(models)-1)*bar_width/2)
+ax1.set_xticklabels(groups)
+ax1.tick_params(axis='x', labelsize=20)
 for i, model in enumerate(models):
     ax1.bar(x + i * bar_width, deepseek_data[model], bar_width, 
             label=new_legend_names[i], **styles[model])
 
 # ---------------------- 5. 绘制 gpt-4o 子图 ----------------------
-ax2.set_ylabel('GPT-4o', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
-ax2.set_ylim(y_lim)
-ax2.set_yticks(show_yticks)
-ax2.tick_params(axis='y', labelsize=12)
-ax2.set_xticks(x + (len(models)-1)*bar_width/2)
-ax2.set_xticklabels(groups)
-ax2.tick_params(axis='x', labelsize=20)
-for i, model in enumerate(models):
-    ax2.bar(x + i * bar_width, gpt_data[model], bar_width, 
-            **styles[model])
+# ax2.set_ylabel('GPT-4o', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
+# ax2.set_ylim(y_lim)
+# ax2.set_yticks(show_yticks)
+# ax2.tick_params(axis='y', labelsize=12)
+# ax2.set_xticks(x + (len(models)-1)*bar_width/2)
+# ax2.set_xticklabels(groups)
+# ax2.tick_params(axis='x', labelsize=20)
+# for i, model in enumerate(models):
+#     ax2.bar(x + i * bar_width, gpt_data[model], bar_width, 
+#             **styles[model])
 
 # ---------------------- 6. 添加数据标签（核心修改） ----------------------
 def add_labels(ax, data):
@@ -78,7 +82,7 @@ def add_labels(ax, data):
                     ha='center', va='bottom', fontsize=10)
 
 add_labels(ax1, deepseek_data)
-add_labels(ax2, gpt_data)
+# add_labels(ax2, gpt_data)
 
 # ---------------------- 7. 图例 ----------------------
 handles, labels = ax1.get_legend_handles_labels()
@@ -87,5 +91,5 @@ fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.85, 0.5),
 
 # ---------------------- 8. 保存与显示 ----------------------
 plt.tight_layout(rect=[0, 0, 0.85, 0.95])  
-plt.savefig('ablation1.pdf', dpi=300, bbox_inches='tight')
+plt.savefig('0.ablation.pdf', dpi=300, bbox_inches='tight')
 plt.show()

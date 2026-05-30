@@ -7,17 +7,17 @@ models = ['M', 'M1', 'M2', 'M3']
 new_legend_names = ['$ClusTopoRCA$', '$ClusTopoRCA_{w/o\ topo}$', '$ClusTopoRCA_{w/o\ clustering}$', '$RCA\\text{-}agent$']
 
 deepseek_data = {
-    'M': [0.3225, 0.5087, 0.6470],
-    'M1': [0.2958, 0.4385, 0.5294],
-    'M2': [0.1290, 0.2631, 0.3529],
-    'M3': [0.2258, 0.3859, 0.5294]
+    'M': [0.3225, 0.5087, 0.6470],  # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/deepseek-r1-0528/Bank_no_RAG_c3_knowledge_graph_advanced_merged_deepseek-r1-0528_difficulty_summary.csv
+    'M1': [0.2958, 0.4385, 0.5294], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/deepseek-r1-0528/Bank_c3_deepseek-r1-0528_difficulty_summary.csv
+    'M2': [0.1290, 0.2631, 0.3529], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/deepseek-r1-0528/Bank_knowledge_graph_advanced_merged_deepseek-r1-0528_difficulty_summary.csv
+    'M3': [0.2258, 0.3859, 0.5294]  # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/deepseek-r1-250528/Bank_original_deepseek-r1-250528_difficulty_summary.csv
 }
 
 gpt_data = {
-    'M': [0.3548, 0.5263, 0.7058],
-    'M1': [0.3225, 0.5087, 0.7058],
-    'M2': [0.1290, 0.1929, 0.3529],
-    'M3': [0.1774, 0.5438, 0.4705]
+    'M': [0.3548, 0.5263, 0.7058], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/gemini-2.5-pro-preview-p/Bank_no_RAG_c3_knowledge_graph_advanced_merged_gemini-2.5-pro-preview-p_difficulty_summary.csv
+    'M1': [0.3225, 0.5087, 0.7058], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/gemini-2.5-pro-preview-p/Bank_c3_gemini-2.5-pro-preview-p_difficulty_summary.csv
+    'M2': [0.1290, 0.1929, 0.3529], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/gemini-2.5-pro-preview-p/Bank_knowledge_graph_advanced_merged_gemini-2.5-pro-preview-p_difficulty_summary.csv
+    'M3': [0.1774, 0.5438, 0.4705]  # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/gemini-2.5-pro-preview-p/Bank_original_gemini-2.5-pro-preview-p_difficulty_summary.csv
 }
 
 # color schemes

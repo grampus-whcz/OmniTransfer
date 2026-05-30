@@ -32,8 +32,8 @@ COMPONENT_BASE_WEIGHT = {
 # LLM配置（GLM-4.7）
 LLM_CONFIG = {
     "model": "glm-4.7",
-    "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
-    "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+    "api_key": "xxx",
+    "api_url": "https://xxx",
     "temperature": 0.7,
     "max_tokens": 8192
 }
@@ -696,7 +696,7 @@ def main():
     
     # 2. 运行LLM驱动分析
     print("\n=== 开始LLM驱动RCA分析 (Bank微服务) ===")
-    api_key = "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa"  # 可改为CLI参数
+    api_key = "xxx"  # 可改为CLI参数
     run_llm_analysis(kg_root_dir, api_key, llm_summary_path)
     
     print("\n✅ 所有分析已完成！")

@@ -291,13 +291,13 @@ def run_programmatic_analysis(kg_dir, summary_output_path):
     return programmatic_summary
 
 # ====================== LLM-driven RCA Analyzer ======================
-# LLM configuration (GLM-4.7)
+# LLM配置（GLM-4.7）
 LLM_CONFIG = {
-    "model": "glm-4.7",  # Model name
-    "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",  # Replace with your API Key
-    "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
-    "temperature": 0.7,    # Low randomness for stable results
-    "max_tokens": 8192     # Maximum output length
+    "model": "glm-4.7",
+    "api_key": "xxx",
+    "api_url": "https://xxx",
+    "temperature": 0.7,
+    "max_tokens": 8192
 }
 
 class LLMbasedRCAAnalyzer:
@@ -592,7 +592,7 @@ def main():
     
     # 2. Run LLM-driven analysis
     print("\n=== Starting LLM-driven RCA Analysis ===")
-    api_key = "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa"  # Can also make this a CLI arg if needed
+    api_key = "xxx"  # Can also make this a CLI arg if needed
     run_llm_analysis(kg_root_dir, api_key, llm_summary_path)
     
     print("\n✅ All analyses completed successfully!")

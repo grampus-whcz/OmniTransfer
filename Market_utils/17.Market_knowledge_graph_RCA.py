@@ -29,11 +29,11 @@ COMPONENT_BASE_WEIGHT = {
     "unknown": 0.5         # Unknown component
 }
 
-# LLM Configuration (GLM-4.7)
+# LLM配置（GLM-4.7）
 LLM_CONFIG = {
-    "model": "glm-4.6",
-    "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
-    "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+    "model": "glm-4.7",
+    "api_key": "xxx",
+    "api_url": "https://xxx",
     "temperature": 0.7,
     "max_tokens": 8192
 }

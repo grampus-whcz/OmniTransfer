@@ -45,23 +45,13 @@ ANOMALY_SEVERITY_WEIGHT = {
     "info": 0.2        # Information - normal event
 }
 
-# LLM Configuration (enhanced GLM-4.7 settings)
-# LLM_CONFIG = {
-#     "model": "glm-4.7",
-#     "api_key": "e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
-#     "api_url": "https://open.bigmodel.cn/api/coding/paas/v4",
-#     "temperature": 0.4,        # Lower for more stable results
-#     "max_tokens": 8192,
-#     "max_retries": 3           # NEW: retry mechanism
-# }
-
+# LLM配置（GLM-4.7）
 LLM_CONFIG = {
-    "model": "deepseek-r1-0528",
-    "api_key": "sk-e8bbbd81c0dc42dfa73d557012d1a3dd",
-    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "temperature": 0.4,        # Lower temperature for more stable results
-    "max_tokens": 8192,
-    "max_retries": 3           # New: maximum retry attempts
+    "model": "glm-4.7",
+    "api_key": "xxx",
+    "api_url": "https://xxx",
+    "temperature": 0.7,
+    "max_tokens": 8192
 }
 
 # Market timezone configuration
@@ -1157,7 +1147,7 @@ def main():
     parser.add_argument("--output_suffix", required=True, help="Time window, e.g., 0230_0300")
     parser.add_argument("--output_folder_name", type=str, default="1116",
                         help="Output folder name (e.g., experiment ID)")
-    parser.add_argument("--api_key", type=str, default="e2bb1c9dcfea446896cdfb3735c98a10.ZwHWlBTzph3t6RIa",
+    parser.add_argument("--api_key", type=str, default="xxx",
                         help="GLM API key")
     parser.add_argument("--ground_truth", type=str, default=None,
                         help="Ground truth JSON file path (optional for evaluation)")

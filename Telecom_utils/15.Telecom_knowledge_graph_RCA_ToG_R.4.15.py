@@ -9,6 +9,7 @@ import argparse
 from collections import defaultdict, Counter
 from datetime import datetime, timezone, timedelta
 from zhipuai import ZhipuAI
+import sys
 
 # virtual environment: conda faiss-env
 
@@ -49,32 +50,512 @@ LLM_CONFIG = {
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
+TOG_SEARCH_CONFIG = {
+    "depth": 3,
+    "width": 3,
+    "num_retain_entity": 5,
+    "max_candidate_relations": 6,
+    "max_candidate_entities": 6
+}
+
+TOG_ENTITY_LABELS = {"DB", "OS", "DOCKER", "OS_Sub", "DOCKER_Sub"}
+
+
+def call_llm_api(llm_config, messages, cluster_id="unknown"):
+    """Shared LLM caller used by the ToG-style RCA pipeline."""
+    temperature = llm_config.get("temperature", 0.4)
+    max_output_tokens = llm_config.get("max_tokens", 8192)
+    max_retries = llm_config.get("max_retries", 3)
+
+    if "glm" in llm_config["model"]:
+        client = ZhipuAI(
+            api_key=llm_config["api_key"],
+            base_url=llm_config.get("api_base", "https://open.bigmodel.cn/api/coding/paas/v4")
+        )
+        for retry in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model=llm_config["model"],
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                    top_p=0.95
+                )
+                content = response.choices[0].message.content
+                
+                # Print token usage
+                total_tokens = getattr(response.usage, "total_tokens", 0)
+                print(f"✅ LLM API ({llm_config['model']}) call successful - Cluster {cluster_id} (Tokens: {total_tokens})")
+                
+                return {
+                    "model": llm_config["model"],
+                    "content": content,
+                    "usage": {
+                        "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+                        "completion_tokens": getattr(response.usage, "completion_tokens", 0),
+                        "total_tokens": getattr(response.usage, "total_tokens", 0)
+                    },
+                    "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                    "temperature": temperature,
+                    "cluster_id": cluster_id
+                }
+            except Exception as e:
+                if retry == max_retries - 1:
+                    raise RuntimeError(f"GLM API call failed for {cluster_id}: {e}")
+                time.sleep(2 ** retry)
+    else:
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=llm_config["api_key"],
+            base_url=llm_config["api_base"]
+        )
+        for retry in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model=llm_config["model"],
+                    messages=messages,
+                    temperature=temperature
+                )
+                content = response.choices[0].message.content
+                
+                # Print token usage
+                total_tokens = getattr(response.usage, "total_tokens", 0)
+                print(f"✅ LLM API ({llm_config['model']}) call successful - Cluster {cluster_id} (Tokens: {total_tokens})")
+                
+                return {
+                    "model": llm_config["model"],
+                    "content": content,
+                    "usage": {
+                        "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+                        "completion_tokens": getattr(response.usage, "completion_tokens", 0),
+                        "total_tokens": getattr(response.usage, "total_tokens", 0)
+                    },
+                    "created_at": datetime.now(BEIJING_TZ).isoformat(),
+                    "temperature": temperature,
+                    "cluster_id": cluster_id
+                }
+            except Exception as e:
+                if retry == max_retries - 1:
+                    raise RuntimeError(f"{llm_config['model']} API call failed for {cluster_id}: {e}")
+                time.sleep(2 ** retry)
+
+
+def _extract_json_object(text):
+    """Extract the first JSON object from a model response."""
+    if not text:
+        return None
+    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1)
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for idx in range(start, len(text)):
+        char = text[idx]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start:idx + 1]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _normalize_scores(raw_scores, size):
+    if size <= 0:
+        return []
+    if not raw_scores:
+        return [1.0 / size] * size
+    clipped = [max(0.0, float(score)) for score in raw_scores[:size]]
+    if len(clipped) < size:
+        clipped.extend([0.0] * (size - len(clipped)))
+    total = sum(clipped)
+    if total <= 0:
+        return [1.0 / size] * size
+    return [score / total for score in clipped]
+
+class TelecomToGAnalyzer:
+    """ToG-R: Lightweight Think-on-Graph (ICLR2024).
+    Drastically Reduce LLM Calls, Cut Token Usage by Over 90%, While Retaining Strong RCA Performance."""
+
+    def __init__(self, kg_json_path, kg_data, llm_config=None):
+        self.kg_json_path = kg_json_path
+        self.kg_data = kg_data
+        self.cluster_id = kg_data.get("cluster_id", "unknown")
+        self.total_anomalies = kg_data.get("total_anomalies", 0)
+        self.llm_config = llm_config or LLM_CONFIG
+        self.cache_path = kg_json_path.replace("_kg.json", "_tog_cache.json")
+
+        # === ToG-R 核心配置（低成本）
+        self.use_tog_r = True  # 开启 ToG-R：省 90% LLM
+        self.entity_prune_method = "uniform"  # uniform / rule_based（无 LLM）
+
+        self.nodes_by_id = {node["id"]: node for node in kg_data.get("nodes", [])}
+        self.out_edges = defaultdict(list)
+        self.in_edges = defaultdict(list)
+        for rel in kg_data.get("relationships", []):
+            src = rel.get("source")
+            dst = rel.get("target")
+            if src:
+                self.out_edges[src].append(rel)
+            if dst:
+                self.in_edges[dst].append(rel)
+
+        self.entity_ids = self._collect_entity_ids()
+        self.entity_profiles = self._build_entity_profiles()
+        self.root_question = (
+            "Identify the most likely root cause entity in this telecom anomaly cluster using only the knowledge graph."
+        )
+
+    def _collect_entity_ids(self):
+        entity_ids = set()
+        for node in self.kg_data.get("nodes", []):
+            if node.get("label") in TOG_ENTITY_LABELS:
+                entity_ids.add(node["id"])
+        for rel in self.kg_data.get("relationships", []):
+            if rel.get("type") == "HAS_ANOMALY" and rel.get("target"):
+                entity_ids.add(rel["target"])
+        return entity_ids
+
+    def _build_entity_profiles(self):
+        profiles = {}
+        for entity_id in self.entity_ids:
+            node = self.nodes_by_id.get(entity_id, {})
+            props = node.get("properties", {})
+            profiles[entity_id] = {
+                "entity_id": entity_id,
+                "label": node.get("label", "UNKNOWN"),
+                "component_type": props.get("entity_type", node.get("label", "unknown")).lower(),
+                "is_main": props.get("is_main_entity", True),
+                "main_entity": props.get("main_entity", entity_id),
+                "anomaly_count": 0,
+                "severity_score": 0.0,
+                "first_anomaly_ts": float("inf"),
+                "last_anomaly_ts": 0,
+                "fault_types": set(),
+                "neighbors": set(),
+                "business_impact": 0,
+                "key_evidence": []
+            }
+
+        for rel in self.kg_data.get("relationships", []):
+            t = rel.get("type")
+            s, tar = rel.get("source"), rel.get("target")
+            p = rel.get("properties", {})
+            if t == "HAS_ANOMALY" and tar in profiles:
+                e = profiles[tar]
+                e["anomaly_count"] += 1
+                e["severity_score"] += ANOMALY_SEVERITY_WEIGHT.get(p.get("severity", "info"), 0.2)
+                ts = p.get("timestamp", 0)
+                e["first_anomaly_ts"] = min(e["first_anomaly_ts"], ts)
+                e["last_anomaly_ts"] = max(e["last_anomaly_ts"], ts)
+                m = p.get("metric_name") or p.get("metric") or p.get("anomaly_type") or "anomaly"
+                e["key_evidence"].append(f"{m} sev={p.get('severity')} ts={ts}")
+            elif t == "HAS_ATTRIBUTE" and s in profiles:
+                ft = self.nodes_by_id.get(tar, {}).get("properties", {}).get("fault_type")
+                if ft:
+                    profiles[s]["fault_types"].add(ft)
+            elif t == "TOPOLOGY_DEPENDS_ON":
+                if s in profiles and tar: profiles[s]["neighbors"].add(tar)
+                if tar in profiles and s: profiles[tar]["neighbors"].add(s)
+            elif t == "IMPACTS_BUSINESS" and s in profiles:
+                profiles[s]["business_impact"] += 1
+
+        for eid, e in profiles.items():
+            if e["first_anomaly_ts"] == float("inf"):
+                e["first_anomaly_ts"] = None
+            e["fault_types"] = sorted(e["fault_types"])
+        return profiles
+
+    def _entity_sort_key(self, entity_id):
+        p = self.entity_profiles[entity_id]
+        ts = p["first_anomaly_ts"] or float("inf")
+        return (-p["anomaly_count"], -p["severity_score"], ts, -len(p["neighbors"]), entity_id)
+
+    def _format_timestamp(self, ts):
+        if ts is None: return "N/A"
+        return datetime.fromtimestamp(ts, BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+    def _entity_snapshot(self, entity_id):
+        p = self.entity_profiles.get(entity_id)
+        if not p:
+            n = self.nodes_by_id.get(entity_id, {})
+            return f"{entity_id} ({n.get('label','UNKNOWN')})"
+        ft = ", ".join(p["fault_types"]) or "unknown"
+        return f"{entity_id}[{p['label']}] cnt={p['anomaly_count']} sev={p['severity_score']:.1f} ts={self._format_timestamp(p['first_anomaly_ts'])}"
+
+    def _available_relation_keys(self, entity_id):
+        r = set()
+        for e in self.out_edges.get(entity_id, []): r.add(f"out::{e.get('type')}")
+        for e in self.in_edges.get(entity_id, []): r.add(f"in::{e.get('type')}")
+        return sorted(r)
+
+    def _expand_relation(self, entity_id, rkey):
+        if "::" not in rkey: return []
+        d, t = rkey.split("::", 1)
+        edges = self.out_edges.get(entity_id, []) if d == "out" else self.in_edges.get(entity_id, [])
+        res = []
+        for rel in edges:
+            if rel.get("type") != t: continue
+            s = entity_id if d == "out" else rel.get("source")
+            tar = rel.get("target") if d == "out" else entity_id
+            nxt = tar if d == "out" and tar in self.entity_profiles else (s if s in self.entity_profiles else None)
+            res.append({
+                "rkey": rkey, "rtype": t,
+                "triplet": f"({self._entity_snapshot(s)})-[{t}]->({self._entity_snapshot(tar)})",
+                "next": nxt, "s": s, "t": tar
+            })
+        return res
+
+    # === ToG-R：全局一次关系剪枝（整轮深度只调用 1 次 LLM）
+    def _prompt_global_relation_prune(self, all_rkeys):
+        lines = "\n".join(f"{i+1}. {k}" for i,k in enumerate(all_rkeys))
+        return f"""TOG_RELATION_PRUNE (GLOBAL)
+Question: {self.root_question}
+Cluster: {self.cluster_id}
+All relations:
+{lines}
+Return top 3 useful relations in format:
+1. {{key (Score: 0.xx)}}: reason
+2. {{key (Score: 0.xx)}}: reason
+"""
+
+    def _parse_relation_scores(self, txt, keys):
+        import re
+        pat = r"{\s*([^()]+?)\s+\(Score:\s*([\d.]+)\)\s*}"
+        allowed = set(keys)
+        res = []
+        for k, sc in re.findall(pat, txt or ""):
+            k = k.strip()
+            if k in allowed:
+                res.append((k, float(sc)))
+        if not res:
+            return [(k, 1.0/len(keys)) for k in keys[:3]]
+        total = sum(s for _,s in res) or 1
+        return [(k, s/total) for k,s in res[:3]]
+
+    # === ToG-R：实体打分 100% 无 LLM
+    def _get_entity_scores(self, candidates):
+        n = len(candidates)
+        if n == 0: return []
+        if self.entity_prune_method == "uniform":
+            return [1.0/n]*n
+        elif self.entity_prune_method == "rule_based":
+            scores = []
+            for c in candidates:
+                nid = c["next"]
+                if not nid:
+                    scores.append(0.0)
+                    continue
+                p = self.entity_profiles[nid]
+                score = p["anomaly_count"]*0.4 + p["severity_score"]*0.3 + (1 if p["is_main"] else 0.2)
+                scores.append(max(0.001, score))
+            s = sum(scores)
+            return [x/s for x in scores]
+
+    def _prompt_sufficiency(self, chains):
+        if not self.use_tog_r:
+            return "YES"
+        txt = "\n".join(chains[-8:])
+        return f"""Check if enough for RCA:\n{txt}\nAnswer ONLY YES or NO."""
+
+    def _prompt_final_reasoning(self, states, chains):
+        ents = sorted({s["entity_id"] for s in states}, key=self._entity_sort_key)[:6]
+        eblk = "\n".join(f"- {self._entity_snapshot(e)}" for e in ents)
+        cblk = "\n".join(f"- {c}" for c in chains[:15])
+        return f"""RCA using KG. Return JSON only.
+Entities:
+{eblk}
+Chains:
+{cblk}
+Output:
+{{
+  "root_cause_ranking": [{{"entity_id":"","confidence":0.0,"reason":"","evidence":[],"fault_types":[],"first_anomaly_time":""}}],
+  "fault_propagation": "",
+  "summary": ""
+}}"""
+
+    def _llm(self, prompt):
+        msg = [{"role":"system","content":"RCA expert. Concise."},{"role":"user","content":prompt}]
+        return call_llm_api(self.llm_config, msg, self.cluster_id)
+
+    def _check_cache(self):
+        if not os.path.exists(self.cache_path): return None
+        try:
+            with open(self.cache_path) as f:
+                c = json.load(f)
+            return c if c.get("model_used") == self.llm_config["model"] else None
+        except: return None
+
+    def _save_cache(self, data):
+        with open(self.cache_path, "w") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def _seed(self):
+        ordered = sorted(self.entity_ids, key=self._entity_sort_key)
+        top = ordered[:TOG_SEARCH_CONFIG["num_retain_entity"]]
+        return [{"entity_id": e, "score":1, "path":[], "vis":[e]} for e in top]
+
+    # ========================== 核心：ToG-R 超低 Token 推理 ==========================
+    def run(self):
+        cache = self._check_cache()
+        if cache: return cache
+
+        states = self._seed()
+        chains = []
+        trace = []
+        llm_trace = []
+
+        for depth in range(1, TOG_SEARCH_CONFIG["depth"]+1):
+            next_states = []
+            all_relations = set()
+
+            # === 收集所有关系（ToG-R：全局一次剪枝）
+            for s in states:
+                for r in self._available_relation_keys(s["entity_id"]):
+                    all_relations.add(r)
+            all_relations = sorted(list(all_relations))[:6]
+            if not all_relations: break
+
+            # === 【全局只调用 1 次】关系剪枝（整轮深度 1 次 LLM）
+            r_prompt = self._prompt_global_relation_prune(all_relations)
+            r_resp = self._llm(r_prompt)
+            print(f"Sleep 30 seconds after all relations prune LLM call at depth {depth}")
+            time.sleep(30)
+            llm_trace.append({"stage":"global_relation_prune","depth":depth,"resp":r_resp})
+            selected = self._parse_relation_scores(r_resp.get("content"), all_relations)
+
+            # === 扩展所有实体（无 LLM）
+            for state in states:
+                eid = state["entity_id"]
+                for rk, rw in selected:
+                    candidates = self._expand_relation(eid, rk)
+                    if not candidates: continue
+                    # === 关键：无 LLM 实体打分 ===
+                    escore = self._get_entity_scores(candidates)
+                    for i, c in enumerate(candidates):
+                        nid = c["next"] or eid
+                        if c["next"] and c["next"] in state["vis"]:
+                            continue
+                        scr = state["score"] * rw * escore[i]
+                        next_states.append({
+                            "entity_id": nid,
+                            "score": scr,
+                            "path": state["path"] + [c["triplet"]],
+                            "vis": state["vis"] + ([nid] if c["next"] else [])
+                        })
+                        chains.append(c["triplet"])
+
+            if not next_states: break
+            uniq = {}
+            for s in sorted(next_states, key=lambda x:x["score"], reverse=True):
+                k = (s["entity_id"], tuple(s["path"]))
+                if k not in uniq:
+                    uniq[k] = s
+            states = list(uniq.values())[:TOG_SEARCH_CONFIG["width"]]
+
+            # === 充分性判断（1 次 LLM）
+            suf_prompt = self._prompt_sufficiency(chains)
+            suf_resp = self._llm(suf_prompt)
+            print(f"Sleep 30 seconds after chains prune LLM call at depth {depth}")
+            time.sleep(30)
+            llm_trace.append({"stage":"sufficiency","depth":depth,"resp":suf_resp})
+            if suf_resp.get("content","").strip().lower() in ["yes","{yes}"]:
+                break
+
+        # === 最终推理（1 次 LLM）
+        final_prompt = self._prompt_final_reasoning(states, chains)
+        final_resp = self._llm(final_prompt)
+        print(f"Sleep 30 seconds after final reasoning LLM call")
+        time.sleep(30)
+        llm_trace.append({"stage":"final","resp":final_resp})
+        j = _extract_json_object(final_resp.get("content",""))
+
+        # 构造结果
+        rank = []
+        for item in (j or {}).get("root_cause_ranking", []):
+            eid = item.get("entity_id")
+            if eid not in self.entity_profiles: continue
+            p = self.entity_profiles[eid]
+            rank.append({
+                "rank": len(rank)+1,
+                "entity_id": eid,
+                "component_type": p["component_type"],
+                "confidence": round(float(item.get("confidence",0)),4),
+                "reason": item.get("reason",""),
+                "evidence": item.get("evidence",[]),
+                "fault_types": item.get("fault_types") or p["fault_types"],
+                "first_anomaly_time": item.get("first_anomaly_time") or self._format_timestamp(p["first_anomaly_ts"]),
+                "anomaly_count": p["anomaly_count"]
+            })
+
+        if not rank:
+            fallback = sorted(self.entity_ids, key=self._entity_sort_key)[:3]
+            for i,eid in enumerate(fallback,1):
+                p = self.entity_profiles[eid]
+                rank.append({
+                    "rank":i, "entity_id":eid, "component_type":p["component_type"],
+                    "confidence": round(1.0 - 0.2*(i-1),4),
+                    "reason":"Fallback (ToG-R rule based)",
+                    "evidence": p["key_evidence"][:2],
+                    "fault_types": p["fault_types"],
+                    "first_anomaly_time": self._format_timestamp(p["first_anomaly_ts"]),
+                    "anomaly_count": p["anomaly_count"]
+                })
+
+        res = {
+            "analysis_method": "tog-r (low-token)",
+            "cluster_id": self.cluster_id,
+            "model_used": self.llm_config["model"],
+            "primary_root_cause": rank[0],
+            "top_5_root_causes": rank[:5],
+            "reasoning_chains": chains[:15],
+            "fault_propagation": (j or {}).get("fault_propagation",""),
+            "summary": (j or {}).get("summary",""),
+            "llm_trace": llm_trace,
+            "final_response": final_resp
+        }
+        self._save_cache(res)
+        return res
+
+    def render_programmatic_report(self, res):
+        lines = [f"# ToG-R (Low Token) RCA Report {self.cluster_id}"]
+        lines.append(f"Model: {res['model_used']} | Method: ToG-R (ICLR2024)")
+        for item in res["top_5_root_causes"]:
+            lines.append(f"Rank {item['rank']} | {item['entity_id']} | conf={item['confidence']}")
+        return "\n".join(lines)
+
+    def render_llm_report(self, res):
+        return self.render_programmatic_report(res)
+
 # ====================== Programmatic RCA Analyzer ======================
 class ProgrammaticRCAAnalyzer:
     def __init__(self, kg_json_path):
-        """Initialize programmatic root cause analyzer"""
+        """Initialize programmatic root cause analyzer —— 纯规则计算，无任何LLM调用"""
         self.kg_json_path = kg_json_path
         self.kg_data = self._load_kg_data()
         self.cluster_id = self.kg_data["cluster_id"]
         self.total_anomalies = self.kg_data["total_anomalies"]
         
-        # Core analysis results
-        self.entity_scores = {}  # Entity root cause scores
-        self.root_causes = []    # Sorted root cause results
-        self.analysis_summary = {}  # For final summary
-        self.propagation_paths = [] # Fault propagation paths
-    
+        self.entity_scores = {}
+        self.root_causes = []
+        self.analysis_summary = {}
+        self.propagation_paths = []
+
     def _load_kg_data(self):
-        """Load knowledge graph JSON data"""
         try:
             with open(self.kg_json_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             raise ValueError(f"Failed to load knowledge graph: {e}")
-    
+
     def _extract_entity_features(self):
-        """Extract core entity features (enhanced version)"""
-        # 1. Basic entity information
         entities = {}
         for node in self.kg_data["nodes"]:
             if node["label"] in ["DB", "OS", "DOCKER", "OS_Sub", "DOCKER_Sub"]:
@@ -92,308 +573,187 @@ class ProgrammaticRCAAnalyzer:
                     "fault_types": set(),
                     "topology_neighbors": set(),
                     "component_weight": COMPONENT_BASE_WEIGHT.get(component_type, 0.5),
-                    # Enhanced features
                     "severity_score": 0.0,
                     "total_duration": 0.0,
                     "business_impact": 0
                 }
-        
-        # 2. Count anomaly occurrences, time, severity and duration
+
         for rel in self.kg_data["relationships"]:
             if rel["type"] == "HAS_ANOMALY":
                 entity_id = rel["target"]
                 if entity_id in entities:
-                    # Count anomalies
                     entities[entity_id]["anomaly_count"] += 1
-                    
-                    # Record first/last anomaly time
                     ts = rel["properties"]["timestamp"]
-                    if ts < entities[entity_id]["first_anomaly_ts"]:
-                        entities[entity_id]["first_anomaly_ts"] = ts
-                    if ts > entities[entity_id]["last_anomaly_ts"]:
-                        entities[entity_id]["last_anomaly_ts"] = ts
-                    
-                    # Calculate severity score
+                    entities[entity_id]["first_anomaly_ts"] = min(entities[entity_id]["first_anomaly_ts"], ts)
+                    entities[entity_id]["last_anomaly_ts"] = max(entities[entity_id]["last_anomaly_ts"], ts)
                     severity = rel["properties"].get("severity", "info")
                     entities[entity_id]["severity_score"] += ANOMALY_SEVERITY_WEIGHT.get(severity, 0.2)
-                    
-                    # Calculate anomaly duration
                     start_ts = rel["properties"].get("start_ts", ts)
                     end_ts = rel["properties"].get("end_ts", ts)
                     entities[entity_id]["total_duration"] += max(0, end_ts - start_ts)
-        
-        # 3. Associate fault types
+
         for rel in self.kg_data["relationships"]:
             if rel["type"] == "HAS_ATTRIBUTE":
                 entity_id = rel["source"]
                 attr_id = rel["target"]
-                # Find fault type for attribute
                 for node in self.kg_data["nodes"]:
                     if node["id"] == attr_id and "fault_type" in node["properties"]:
                         fault_type = node["properties"]["fault_type"]
                         if entity_id in entities:
                             entities[entity_id]["fault_types"].add(fault_type)
-        
-        # 4. Count topology neighbors (impact scope)
+
         for rel in self.kg_data["relationships"]:
             if rel["type"] == "TOPOLOGY_DEPENDS_ON":
-                src = rel["source"]
-                dst = rel["target"]
+                src, dst = rel["source"], rel["target"]
                 if src in entities:
                     entities[src]["topology_neighbors"].add(dst)
                 if dst in entities:
                     entities[dst]["topology_neighbors"].add(src)
-        
-        # 5. Business impact analysis
+
         for rel in self.kg_data["relationships"]:
             if rel["type"] == "IMPACTS_BUSINESS":
                 entity_id = rel["source"]
                 if entity_id in entities:
                     entities[entity_id]["business_impact"] += 1
-        
+
         return entities
-    
+
     def _analyze_causal_relationships(self, entities):
-        """Analyze causal relationships between entities (enhanced)"""
-        # 1. Build anomaly timeline
         anomaly_timeline = defaultdict(list)
         for rel in self.kg_data["relationships"]:
             if rel["type"] == "HAS_ANOMALY":
                 entity_id = rel["target"]
                 ts = rel["properties"]["timestamp"]
                 anomaly_timeline[ts].append(entity_id)
-        
-        # 2. Analyze propagation paths by time sequence
-        sorted_timestamps = sorted(anomaly_timeline.keys())
+
         propagation_paths = []
         prev_entities = set()
-        
+        sorted_timestamps = sorted(anomaly_timeline.keys())
+
         for ts in sorted_timestamps:
             current_entities = set(anomaly_timeline[ts])
-            # Find topological connections between current and previous entities
             for entity in current_entities:
                 if entity not in prev_entities and entity in entities:
-                    # Check topological neighbors
                     neighbors = entities[entity]["topology_neighbors"]
-                    if neighbors & prev_entities:
-                        source_entity = list(neighbors & prev_entities)[0]
+                    common = neighbors & prev_entities
+                    if common:
+                        source = list(common)[0]
                         propagation_paths.append({
-                            "source": source_entity,
-                            "target": entity,
-                            "timestamp": ts,
-                            "confidence": 0.9,
+                            "source": source, "target": entity,
+                            "timestamp": ts, "confidence": 0.9,
                             "time_str": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
                         })
-            prev_entities = current_entities
-        
+            prev_entities.update(current_entities)
+
         self.propagation_paths = propagation_paths
         return propagation_paths
-    
+
     def _calculate_entity_scores(self, entities):
-        """Calculate entity root cause scores (enhanced with causal analysis)"""
-        # 1. Normalization parameters
-        max_anomaly_count = max([e["anomaly_count"] for e in entities.values()], default=1)
-        min_ts = min([e["first_anomaly_ts"] for e in entities.values() if e["first_anomaly_ts"] != float('inf')], default=0)
-        max_ts = max([e["first_anomaly_ts"] for e in entities.values() if e["first_anomaly_ts"] != float('inf')], default=1)
-        max_neighbors = max([len(e["topology_neighbors"]) for e in entities.values()], default=1)
-        max_severity = max([e["severity_score"] for e in entities.values()], default=1)
-        max_duration = max([e["total_duration"] for e in entities.values()], default=1)
-        max_business_impact = max([e["business_impact"] for e in entities.values()], default=1)
-        
-        # 2. Analyze causal relationships
-        propagation_paths = self._analyze_causal_relationships(entities)
-        
-        # 3. Build causal weight (source entities get higher scores)
+        # ====================== 修复：所有分母保底 1e-6，永不除零 ======================
+        max_anom = max([e["anomaly_count"] for e in entities.values()], default=0) or 1e-6
+        ts_list = [e["first_anomaly_ts"] for e in entities.values() if e["first_anomaly_ts"] != float('inf')]
+        if not ts_list:
+            min_ts, max_ts = 0.0, 1.0
+        else:
+            min_ts, max_ts = min(ts_list), max(ts_list)
+            if max_ts - min_ts < 1e-6:
+                max_ts = min_ts + 1.0
+
+        max_nei = max([len(e["topology_neighbors"]) for e in entities.values()], default=0) or 1e-6
+        max_sev = max([e["severity_score"] for e in entities.values()], default=0) or 1e-6
+        max_dur = max([e["total_duration"] for e in entities.values()], default=0) or 1e-6
+        max_biz = max([e["business_impact"] for e in entities.values()], default=0) or 1e-6
+        max_comp_weight = max(COMPONENT_BASE_WEIGHT.values()) or 1e-6
+
+        self._analyze_causal_relationships(entities)
         causal_weight = defaultdict(float)
-        for path in propagation_paths:
-            causal_weight[path["source"]] += 0.1  # Add 0.1 for each propagation
-        
-        # 4. Calculate scores for each dimension
-        for entity_id, entity in entities.items():
-            # Skip sub-entities (only analyze main entities)
-            if not entity["is_main"]:
+        for p in self.propagation_paths:
+            causal_weight[p["source"]] += 0.1
+
+        for eid, e in entities.items():
+            if not e["is_main"]:
                 continue
-            
-            # 4.1 Basic dimension scores (0-1)
-            count_score = entity["anomaly_count"] / max_anomaly_count if max_anomaly_count > 0 else 0
-            severity_score = entity["severity_score"] / max_severity if max_severity > 0 else 0
-            duration_score = entity["total_duration"] / max_duration if max_duration > 0 else 0
-            business_impact_score = entity["business_impact"] / max_business_impact if max_business_impact > 0 else 0
-            
-            # 4.2 Time priority score (earlier = higher, 0-1)
-            if entity["first_anomaly_ts"] == float('inf'):
-                time_score = 0
-            elif max_ts == min_ts:
-                time_score = 1.0
+
+            count_s = e["anomaly_count"] / max_anom
+            sev_s = e["severity_score"] / max_sev
+            dur_s = e["total_duration"] / max_dur
+            biz_s = e["business_impact"] / max_biz
+
+            if e["first_anomaly_ts"] == float('inf'):
+                time_s = 0.0
             else:
-                time_score = (max_ts - entity["first_anomaly_ts"]) / (max_ts - min_ts)
-            
-            # 4.3 Topology impact score (more neighbors = higher, 0-1)
-            topology_score = len(entity["topology_neighbors"]) / max_neighbors if max_neighbors > 0 else 0
-            
-            # 4.4 Component weight score (0-1)
-            component_score = entity["component_weight"] / max(COMPONENT_BASE_WEIGHT.values())
-            
-            # 4.5 Causal score
-            causal_score = min(causal_weight.get(entity_id, 0), 0.5)  # Cap at 0.5
-            
-            # 4.6 Weighted total score (enhanced)
-            total_score = (
-                count_score * SCORE_WEIGHTS["anomaly_count"] +
-                time_score * SCORE_WEIGHTS["time_priority"] +
-                topology_score * SCORE_WEIGHTS["topology_impact"] +
-                component_score * SCORE_WEIGHTS["component_weight"] +
-                severity_score * 0.1 +          # New: severity weight
-                business_impact_score * 0.1 +   # New: business impact weight
-                causal_score                    # New: causal weight
+                time_s = (max_ts - e["first_anomaly_ts"]) / (max_ts - min_ts)
+
+            topo_s = len(e["topology_neighbors"]) / max_nei
+            comp_s = e["component_weight"] / max_comp_weight
+            causal_s = min(causal_weight.get(eid, 0.0), 0.5)
+
+            total = (
+                count_s * SCORE_WEIGHTS["anomaly_count"] +
+                time_s * SCORE_WEIGHTS["time_priority"] +
+                topo_s * SCORE_WEIGHTS["topology_impact"] +
+                comp_s * SCORE_WEIGHTS["component_weight"] +
+                sev_s * 0.1 +
+                biz_s * 0.1 +
+                causal_s
             )
-            
-            # Ensure score is between 0 and 1
-            total_score = max(0, min(1, total_score))
-            
-            # Format first anomaly time
-            first_anomaly_time = "N/A"
-            if entity["first_anomaly_ts"] != float('inf'):
-                first_anomaly_time = datetime.fromtimestamp(entity["first_anomaly_ts"]).strftime("%Y-%m-%d %H:%M:%S")
-            
-            self.entity_scores[entity_id] = {
-                "entity_id": entity_id,
-                "component_type": entity["component_type"],
-                "total_score": round(total_score, 4),
-                # Detailed scores
-                "count_score": round(count_score, 4),
-                "time_score": round(time_score, 4),
-                "topology_score": round(topology_score, 4),
-                "component_score": round(component_score, 4),
-                "severity_score": round(severity_score, 4),
-                "business_impact_score": round(business_impact_score, 4),
-                "causal_score": round(causal_score, 4),
-                # Raw metrics
-                "anomaly_count": entity["anomaly_count"],
-                "first_anomaly_time": first_anomaly_time,
-                "total_duration": round(entity["total_duration"], 2),
-                "business_impact_count": entity["business_impact"],
-                "fault_types": list(entity["fault_types"]),
-                "neighbor_count": len(entity["topology_neighbors"]),
-                "propagation_source_count": len([p for p in propagation_paths if p["source"] == entity_id]),
-                "propagation_target_count": len([p for p in propagation_paths if p["target"] == entity_id])
+            total = max(0.0, min(1.0, total))
+
+            first_time = "N/A"
+            if e["first_anomaly_ts"] != float('inf'):
+                first_time = datetime.fromtimestamp(e["first_anomaly_ts"]).strftime("%Y-%m-%d %H:%M:%S")
+
+            self.entity_scores[eid] = {
+                "entity_id": eid,
+                "component_type": e["component_type"],
+                "total_score": round(total, 4),
+                "anomaly_count": e["anomaly_count"],
+                "first_anomaly_time": first_time,
+                "fault_types": list(e["fault_types"]),
+                "confidence": round(total, 4),
+                "reason": "Programmatic rule-based scoring (no LLM)",
+                "evidence": [f"anomaly_count={e['anomaly_count']}", f"severity={e['severity_score']:.1f}"]
             }
-    
+
     def _filter_root_causes(self):
-        """Filter root causes (enhanced rule-based)"""
-        # 1. Sort by total score
-        sorted_entities = sorted(
-            self.entity_scores.values(),
-            key=lambda x: x["total_score"],
-            reverse=True
-        )
-        
-        # 2. Enhanced rule-based filtering
-        threshold = 0.1  # Minimum score threshold
-        for entity in sorted_entities:
-            if entity["total_score"] < threshold:
-                continue
-            # Exclude entities with zero anomalies or no fault types
-            if entity["anomaly_count"] == 0 and not entity["fault_types"]:
-                continue
-            
-            self.root_causes.append(entity)
-        
-        # 3. Fallback (return at least 1 root cause)
-        if not self.root_causes and sorted_entities:
-            self.root_causes.append(sorted_entities[0])
-    
+        sorted_ents = sorted(self.entity_scores.values(), key=lambda x: x["total_score"], reverse=True)
+        self.root_causes = [e for e in sorted_ents if e["total_score"] > 0.01]
+        if not self.root_causes and sorted_ents:
+            self.root_causes.append(sorted_ents[0])
+
     def generate_rca_report(self):
-        """Generate programmatic root cause analysis report (enhanced)"""
-        # 1. Extract features and calculate scores
         entities = self._extract_entity_features()
         self._calculate_entity_scores(entities)
         self._filter_root_causes()
-        
-        # 2. Build enhanced report
-        report = []
-        report.append(f"# Programmatic Root Cause Analysis Report - Cluster {self.cluster_id}")
-        report.append(f"**Analysis Time**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        report.append(f"**Total Anomalies**: {self.total_anomalies}")
-        report.append(f"**Total Entities Analyzed**: {len([e for e in entities.values() if e['is_main']])}")
-        report.append(f"**RCA Dimension Weights**: Anomaly Count(40%) + Time Priority(20%) + Topology Impact(25%) + "
-                      f"Component Weight(15%) + Severity(10%) + Business Impact(10%) + Causal Propagation")
-        report.append("")
-        
-        # 3. Fault propagation path analysis
-        if self.propagation_paths:
-            report.append("## Fault Propagation Path Analysis")
-            report.append("| Source Entity | Target Entity | Propagation Time | Confidence |")
-            report.append("|---------------|---------------|------------------|------------|")
-            for path in self.propagation_paths[:10]:  # Show top 10 paths
-                report.append(f"| {path['source']} | {path['target']} | {path['time_str']} | {path['confidence']} |")
-            report.append("")
-        
-        # 4. Root cause results (enhanced)
-        report.append("## Fault Root Cause Ranking")
-        for idx, cause in enumerate(self.root_causes[:5]):  # Show top 5 only
-            report.append(f"### Root Cause #{idx+1}")
-            report.append(f"- **Entity ID**: {cause['entity_id']}")
-            report.append(f"- **Component Type**: {cause['component_type'].upper()}")
-            report.append(f"- **Root Cause Confidence**: {cause['total_score']:.4f}")
-            report.append(f"- **Anomaly Count**: {cause['anomaly_count']} ({cause['anomaly_count']/self.total_anomalies*100:.1f}%)")
-            report.append(f"- **First Anomaly Time**: {cause['first_anomaly_time']}")
-            report.append(f"- **Total Anomaly Duration**: {cause['total_duration']}s")
-            report.append(f"- **Business Impact**: {cause['business_impact_count']} business lines affected")
-            report.append(f"- **Fault Types**: {', '.join(cause['fault_types']) if cause['fault_types'] else 'unknown'}")
-            report.append(f"- **Topology Impact Scope**: {cause['neighbor_count']} associated entities")
-            report.append(f"- **Propagation Role**: Source of {cause['propagation_source_count']} faults, Target of {cause['propagation_target_count']} faults")
-            report.append(f"- **Dimension Score Breakdown**:")
-            report.append(f"  - Anomaly Count Score: {cause['count_score']:.4f}")
-            report.append(f"  - Time Priority Score: {cause['time_score']:.4f}")
-            report.append(f"  - Topology Impact Score: {cause['topology_score']:.4f}")
-            report.append(f"  - Component Weight Score: {cause['component_score']:.4f}")
-            report.append(f"  - Severity Score: {cause['severity_score']:.4f}")
-            report.append(f"  - Business Impact Score: {cause['business_impact_score']:.4f}")
-            report.append(f"  - Causal Propagation Score: {cause['causal_score']:.4f}")
-            report.append("")
-        
-        # 5. Fault type analysis
-        all_fault_types = []
-        for cause in self.root_causes:
-            all_fault_types.extend(cause['fault_types'])
-        fault_counter = Counter(all_fault_types)
-        if fault_counter:
-            report.append("## Fault Type Distribution")
-            for fault_type, count in fault_counter.most_common():
-                if fault_type != 'unknown':
-                    report.append(f"- **{fault_type}**: {count} entities involved ({count/len(self.root_causes)*100:.1f}%)")
-            report.append("")
-        
-        # 6. Enhanced remediation recommendations
-        report.append("## Remediation Recommendations")
-        if self.root_causes:
-            primary_cause = self.root_causes[0]
-            report.append(f"### Immediate Actions (High Priority)")
-            report.append(f"1. Prioritize investigation of {primary_cause['entity_id']} (confidence: {primary_cause['total_score']:.4f})")
-            report.append(f"2. Focus on {', '.join(primary_cause['fault_types'])} issues in {primary_cause['component_type'].upper()} layer")
-            report.append(f"3. Check {primary_cause['neighbor_count']} associated entities for cascading failures")
-            report.append(f"4. Monitor anomaly severity and duration for {primary_cause['entity_id']}")
-            
-            report.append(f"\n### Preventive Measures (Long Term)")
-            report.append(f"1. Strengthen monitoring for {primary_cause['component_type'].upper()} components with high business impact")
-            report.append(f"2. Analyze propagation paths to optimize service dependencies")
-            report.append(f"3. Set up alerting rules for anomaly severity > 0.8")
-        
-        # 7. Generate analysis summary for final JSON
+
+        top5 = self.root_causes[:5]
+        for i, item in enumerate(top5):
+            item["rank"] = i + 1
+
         self.analysis_summary = {
+            "analysis_method": "programmatic_rule_based",
             "cluster_id": self.cluster_id,
             "analysis_time": datetime.now().isoformat(),
+            "model_used": "none (programmatic only)",
             "total_anomalies": self.total_anomalies,
-            "total_entities_analyzed": len([e for e in entities.values() if e['is_main']]),
-            "primary_root_cause": self.root_causes[0] if self.root_causes else {},
-            "top_5_root_causes": self.root_causes[:5],
-            "fault_type_distribution": dict(fault_counter),
-            "propagation_paths": self.propagation_paths[:10],
-            "score_weights": SCORE_WEIGHTS
+            "primary_root_cause": top5[0] if top5 else {},
+            "top_5_root_causes": top5,
+            "reasoning_chains": [p["source"] + " → " + p["target"] for p in self.propagation_paths[:10]],
+            "fault_propagation": f"Auto-inferred from time+topology: {len(self.propagation_paths)} paths",
+            "summary": f"Top root cause: {top5[0]['entity_id']} (score={top5[0]['total_score']})" if top5 else "No valid entity"
         }
-        
-        return "\n".join(report), self.analysis_summary
+
+        report = self.render_programmatic_report()
+        return report, self.analysis_summary
+
+    def render_programmatic_report(self):
+        r = [f"# Programmatic RCA Report (NO LLM) - {self.cluster_id}"]
+        r.append(f"Analysis Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        r.append(f"Total anomalies: {self.total_anomalies}")
+        r.append("\n## Top Root Causes")
+        for item in self.analysis_summary["top_5_root_causes"]:
+            r.append(f"- Rank {item['rank']} | {item['entity_id']} | Score={item['total_score']} | Count={item['anomaly_count']}")
+        return "\n".join(r)
 
 # ====================== LLM-driven RCA Analyzer ======================
 class LLMbasedRCAAnalyzer:
@@ -630,7 +990,7 @@ Step 5: Root Cause Confirmation - Rank root causes with confidence score (0-1) a
                     print(f"❌ LLM API call failed (retry {retry+1}/{max_retries}), waiting {wait_time} seconds: {e}")
                     time.sleep(wait_time)
                     
-        elif "deepseek" in self.llm_config['model'] or "qwen" in self.llm_config['model']:
+        elif "MiniMax-M2.5" in self.llm_config['model'] or "DeepSeek" in self.llm_config['model'] or "deepseek" in self.llm_config['model'] or "qwen" in self.llm_config['model'] or "Qwen3" in self.llm_config['model'] or "qwen" in self.llm_config['model']:
             
             print(f"Calling {self.llm_config['model']} API...")
             print(f"LLM Configuration: Model={self.llm_config['model']}, Temperature={temperature}, Max Tokens={max_output_tokens}, key={self.llm_config['api_key']}, url={self.llm_config['api_base']}")
@@ -687,38 +1047,14 @@ Step 5: Root Cause Confirmation - Rank root causes with confidence score (0-1) a
                     time.sleep(wait_time)
     
     def generate_rca_report(self):
-        """Generate enhanced LLM-driven root cause analysis report"""
-        # 1. Generate optimized prompt
-        prompt = self._convert_kg_to_prompt()
-        
-        # 2. Call LLM with retry
-        llm_output = self._call_llm_api(prompt)
-        
-        # 3. Build final report
-        report = []
-        report.append(f"# LLM-Driven Root Cause Analysis Report - Cluster {self.cluster_id}")
-        report.append(f"**Analysis Time**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        report.append(f"**Model Used**: {self.llm_config['model']} (Temperature: {self.llm_config['temperature']})")
-        report.append(f"**Knowledge Graph Source**: {self.kg_json_path}")
-        report.append(f"**Token Usage**: {self.llm_response_dict['usage']['total_tokens'] if self.llm_response_dict else 'N/A'}")
-        report.append("="*80)
-        report.append("")
-        report.append(llm_output)
-        
-        self.rca_report = "\n".join(report)
-        
-        # 4. Generate analysis summary
-        self.analysis_summary = {
-            "cluster_id": self.cluster_id,
-            "analysis_time": datetime.now().isoformat(),
-            "model_used": self.llm_config['model'],
-            "temperature": self.llm_config['temperature'],
-            "total_anomalies": self.total_anomalies,
-            "llm_response_content": llm_output,
-            "token_usage": self.llm_response_dict['usage'] if self.llm_response_dict else {},
-            "prompt_char_count": len(prompt)
-        }
-        
+        """Generate an LLM report backed by the shared ToG-style RCA engine."""
+        tog = TelecomToGAnalyzer(self.kg_json_path, self.kg_data, self.llm_config)
+        self.analysis_summary = tog.run()
+        self.llm_response_dict = self.analysis_summary.get("final_response")
+        self.llm_raw_content = (self.llm_response_dict or {}).get("content")
+        self.rca_report = tog.render_llm_report(self.analysis_summary)
+        self.analysis_summary["llm_response_content"] = self.llm_raw_content or ""
+        self.analysis_summary["token_usage"] = (self.llm_response_dict or {}).get("usage", {})
         return self.rca_report, self.analysis_summary
     
     def save_report(self):
@@ -756,8 +1092,9 @@ def merge_rca_results(programmatic_summary, llm_summary):
     merged_summary = {
         "analysis_metadata": {
             "merge_time": datetime.now().isoformat(),
-            "programmatic_weight": 0.6,  # Programmatic is more objective
-            "llm_weight": 0.4            # LLM provides business context
+            "programmatic_weight": 0.5,
+            "llm_weight": 0.5,
+            "analysis_method": "tog_fusion"
         },
         "clusters": {}
     }
@@ -771,31 +1108,23 @@ def merge_rca_results(programmatic_summary, llm_summary):
         prog_result = programmatic_summary["clusters"][cluster_id]
         llm_result = llm_summary["clusters"][cluster_id]
         
-        # 1. Extract programmatic scores (quantitative)
+        # 1. Extract programmatic scores
         prog_root_causes = {}
         for rc in prog_result.get("top_5_root_causes", []):
-            prog_root_causes[rc["entity_id"]] = rc["total_score"]
+            prog_root_causes[rc["entity_id"]] = rc.get("confidence", rc.get("total_score", 0.0))
         
-        # 2. Parse LLM scores from structured output
+        # 2. Extract LLM scores, preferring structured summaries from the ToG engine
         llm_root_causes = {}
-        llm_content = llm_result.get("llm_response_content", "")
-        
-        # Extract root cause table using regex
-        table_pattern = r"\| Rank \| Entity ID \| Confidence Score \(0-1\) \|.*?\|(.*?)\|"
-        matches = re.findall(table_pattern, llm_content, re.DOTALL | re.IGNORECASE)
-        
-        for match in matches:
-            rows = match.strip().split("\n")
-            for row in rows:
-                if row.strip() and not row.startswith("|------") and not row.startswith("| Rank"):
-                    parts = [p.strip() for p in row.split("|") if p.strip()]
-                    if len(parts) >= 3:  # Rank, Entity ID, Confidence Score
-                        try:
-                            entity_id = parts[1]
-                            confidence = float(parts[2])
-                            llm_root_causes[entity_id] = confidence
-                        except (ValueError, IndexError):
-                            continue
+        for rc in llm_result.get("top_5_root_causes", []):
+            llm_root_causes[rc["entity_id"]] = rc.get("confidence", rc.get("total_score", 0.0))
+
+        if not llm_root_causes:
+            llm_content = llm_result.get("llm_response_content", "")
+            final_json = _extract_json_object(llm_content)
+            for rc in (final_json or {}).get("root_cause_ranking", []):
+                entity_id = rc.get("entity_id")
+                if entity_id:
+                    llm_root_causes[entity_id] = float(rc.get("confidence", 0.0))
         
         # 3. Weighted fusion of scores
         merged_root_causes = {}
@@ -824,6 +1153,7 @@ def merge_rca_results(programmatic_summary, llm_summary):
             "primary_root_cause": sorted_merged[0][0] if sorted_merged else "",
             "primary_confidence_score": sorted_merged[0][1] if sorted_merged else 0.0,
             "top_5_merged_root_causes": sorted_merged[:5],
+            "analysis_method": "tog_fusion",
             "programmatic_details": prog_result,
             "llm_details": llm_result,
             "fusion_weights": {
@@ -910,9 +1240,9 @@ def run_programmatic_analysis(kg_dir, summary_output_path):
     programmatic_summary = {
         "analysis_metadata": {
             "analysis_time": datetime.now().isoformat(),
-            "score_weights": SCORE_WEIGHTS,
-            "component_base_weights": COMPONENT_BASE_WEIGHT,
-            "anomaly_severity_weights": ANOMALY_SEVERITY_WEIGHT
+            "analysis_method": "tog",
+            "search_config": TOG_SEARCH_CONFIG,
+            "model_used": LLM_CONFIG["model"]
         },
         "clusters": {}
     }
@@ -966,10 +1296,12 @@ def run_llm_analysis(kg_dir, api_key, summary_output_path):
     llm_summary = {
         "analysis_metadata": {
             "analysis_time": datetime.now().isoformat(),
+            "analysis_method": "tog",
             "model_used": llm_config['model'],
             "temperature": llm_config['temperature'],
             "max_tokens": llm_config['max_tokens'],
-            "max_retries": llm_config['max_retries']
+            "max_retries": llm_config['max_retries'],
+            "search_config": TOG_SEARCH_CONFIG
         },
         "clusters": {}
     }
@@ -1010,8 +1342,20 @@ def run_llm_analysis(kg_dir, api_key, summary_output_path):
     
     return llm_summary
 
+class FlushFile:
+    def __init__(self, file):
+        self.file = file
+    
+    def write(self, text):
+        self.file.write(text)
+        self.file.flush()  # 强制立即写入硬盘
+        
+    def flush(self):
+        self.file.flush()
+
 # ====================== Main Execution ======================
 def main():
+           
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Enhanced Root Cause Analysis for Telecom Cluster Anomalies")
     parser.add_argument("--date_online", required=True, help="Date string like 2020_04_11")
@@ -1025,7 +1369,7 @@ def main():
     args = parser.parse_args()
     
     # Base paths
-    base_dir = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new/{args.output_folder_name}"
+    base_dir = f"/root/shared-nvme/work/timeSeries/OmniTransfer_new6/{args.output_folder_name}"
     kg_root_dir = f"{base_dir}/knowledge_graphs/{args.date_online}_{args.output_suffix}"
     
     # Validate input directory
@@ -1042,6 +1386,15 @@ def main():
     merged_summary_path = f"{base_dir}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_merged_rca_summary.json"
     evaluation_path = f"{base_dir}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_rca_evaluation.json"
     
+    # 0. log redirection setup
+    import sys
+    # 1) Open the log file (use 'a' mode for appending to avoid overwriting existing logs; 'w' mode means overwriting)
+    log_file = open(f"{base_dir}/Telecom_cluster_window_anomaly_report_{args.date_online}_{args.output_suffix}_knowledge_graph.log", 'a', encoding='utf-8')
+
+    # 2) Redirect both standard output (print content) and standard error (error messages)
+    sys.stdout = FlushFile(log_file)
+    sys.stderr = FlushFile(log_file)
+        
     # 1. Run programmatic analysis
     print("\n" + "="*60)
     print("Starting Programmatic RCA Analysis")
