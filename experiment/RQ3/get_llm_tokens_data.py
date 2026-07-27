@@ -1,7 +1,7 @@
 import csv
 
 # 文件路径
-file_path = "/root/shared-nvme/work/agent/ADS-KGRCA/experiments/Market_cloudbed-2_task_total_tokens_combined_gpt-4o-ca.csv"
+file_path = "/root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank_task_total_tokens_combined_d5_w5_gpt-4o-ca.csv"
 
 # 存储 total_tokens 的列表
 total_tokens_list = []

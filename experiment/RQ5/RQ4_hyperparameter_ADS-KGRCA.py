@@ -25,7 +25,7 @@ y_green_p = np.array([0.5294, 0.5294, 0.5294, 0.4706, 0.5294, 0.4706])
 label_fontsize = 20  # 设置字体大小
 
 # 创建图形
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 7), sharex=True)  # 增加宽度以便为图例留出空间
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 6), sharex=True)  # 增加宽度以便为图例留出空间
 
 # ********** 关键修改1：定义要显示的刻度（仅0、0.5、0.75）**********
 show_yticks = [0, 0.5, 0.75]

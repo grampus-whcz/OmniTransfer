@@ -23,5 +23,25 @@
 #   --end $END_TS \
 #   --output ./trace_anomalies_10_to_12.npy
 
-/root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/run_pipline_Bank_metric_container.py \
---date_offline 2021_03_05 --date_online 2021_03_06 --start_ts 1614960000 --end_ts 1614967200 --method TranAD --output_folder_name 1117 --output_suffix 0000_0200
+# /root/shared-nvme/.conda/envs/OmniTransfer_py3.7/bin/python /root/shared-nvme/work/timeSeries/OmniTransfer_new/run_pipline_Bank_metric_container.py \
+# --date_offline 2021_03_05 --date_online 2021_03_06 --start_ts 1614960000 --end_ts 1614967200 --method TranAD --output_folder_name 1117 --output_suffix 0000_0200
+
+python 2.Bank_cluster_window_analyze_anomalies_old_ablation.py \
+--date_online 2021_03_04 \
+--output_suffix 0100_0130 \
+--eps 60 \
+--min_samples 3 \
+--output_folder_name 1204
+
+# # 拓扑感知聚类，时序分段5分钟
+# python 2.Bank_cluster_window_analyze_anomalies_old_topo_aware.py \
+# --date_online 2021_03_04 \
+# --output_suffix 0100_0130 \
+# --output_folder_name 1204
+
+# # 示例：5分钟等宽分段
+# python 2.Bank_cluster_window_analyze_anomalies_old_equal_width.py \
+# --date_online 2021_03_04 \
+# --output_suffix 0100_0130 \
+# --seg_width 300 \
+# --output_folder_name 1204

@@ -3,14 +3,16 @@ import numpy as np
 
 # ---------------------- 1. 数据准备 ----------------------
 groups = [r'$Easy$', r'$Mid$', r'$Hard$']
-models = ['M', 'M1', 'M2', 'M3']
-new_legend_names = ['$\\text{ADS-KGRCA}$', '$\\text{ADS-KGRCA}_{w/o\ KG}$', '$\\text{ADS-KGRCA}_{w/o\ cl}$', '$\\text{RCA-agent}$']
+# models = ['M', 'M1', 'M2', 'M3']
+# new_legend_names = ['$\\text{ADS-KGRCA}$', '$\\text{ADS-KGRCA}_{w/o\ KG}$', '$\\text{ADS-KGRCA}_{w/o\ cl}$', '$\\text{RCA-agent}$']
+models = ['M', 'M1', 'M2']
+new_legend_names = ['$\\text{ADS-KGRCA}$', '$\\text{ADS-KGRCA}_{w/o\ KG}$', '$\\text{ADS-KGRCA}_{w/o\ cl}$']
 
 deepseek_data = {
-    'M': [0.2903, 0.4912, 0.5294], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/deepseek-r1-0528/Bank_adskg_tog_llm_deepseek-r1-0528_difficulty_summary.csv
+    'M': [0.2742, 0.4912, 0.5882], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/deepseek-r1-0528/Bank_adskg_tog_llm_deepseek-r1-0528_difficulty_summary.csv
     'M1': [0.2951, 0.4386, 0.5294], # /root/shared-nvme/work/agent/OpenRCA/experiments/Bank/deepseek-r1-0528/Bank_c3_deepseek-r1-0528_difficulty_summary.csv
-    'M2': [0.1452, 0.1930, 0.2353], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/deepseek-r1-0528/Bank_adskg_tog_llm_ablation_no_clustering_deepseek-r1-0528_difficulty_summary.csv
-    'M3': [0.2258, 0.3860, 0.5294] # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/deepseek-r1-250528/Bank_original_deepseek-r1-250528_difficulty_summary.csv
+    'M2': [0.1290, 0.1754, 0.1765], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/deepseek-r1-0528/Bank_adskg_tog_llm_ablation_no_clustering_deepseek-r1-0528_difficulty_summary.csv
+    # 'M3': [0.2258, 0.3860, 0.5294] # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/deepseek-r1-250528/Bank_original_deepseek-r1-250528_difficulty_summary.csv
 }
 
 # gemini
@@ -23,17 +25,17 @@ deepseek_data = {
 
 # glm-4.5
 gpt_data = {
-    'M': [0.2903, 0.5088, 0.5294], #/root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/glm-4.5/Bank_adskg_tog_llm_glm-4.5_difficulty_summary.csv
+    'M': [0.2903, 0.5439, 0.5882], #/root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/glm-4.5/Bank_adskg_tog_llm_glm-4.5_difficulty_summary.csv
     'M1': [0.2951, 0.4464, 0.5294], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/glm-4.5/Bank_adskg_tog_llm_ablation_clustering_3_no_ToG-EE_glm-4.5_difficulty_summary.csv
-    'M2': [0.1579, 0.1800, 0.5882], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/glm-4.5/Bank_adskg_tog_llm_ablation_no_clustering_glm-4.5_difficulty_summary.csv
-    'M3': [0.0323, 0.2632, 0.5294] # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/glm-4.5/Bank_original_glm-4.5_difficulty_summary.csv
+    'M2': [0.1481, 0.2885, 0.3333], # /root/shared-nvme/work/agent/ADS-KGRCA/experiments/Bank/glm-4.5/Bank_adskg_tog_llm_ablation_no_clustering_glm-4.5_difficulty_summary.csv
+    # 'M3': [0.0323, 0.2632, 0.5294] # /root/shared-nvme/work/agent/RCA-agent/RCA-agent/experiments_original/Bank/glm-4.5/Bank_original_glm-4.5_difficulty_summary.csv
 }
 
 styles = {
     'M':  {'hatch': '///', 'color': "#D4E6F1", 'edgecolor': 'black'},
     'M1': {'hatch': '...', 'color': "#FCF3CF", 'edgecolor': 'black'},
     'M2': {'hatch': 'xxx', 'color': "#D5F5E3", 'edgecolor': 'black'},
-    'M3': {'hatch': '|||', 'color': "#FADBD8", 'edgecolor': 'black'}
+    # 'M3': {'hatch': '|||', 'color': "#FADBD8", 'edgecolor': 'black'}
 }
 
 bar_width = 0.15
@@ -53,7 +55,7 @@ show_yticks = [0.2, 0.5, 0.7]
 y_lim = (0.1, 0.75) # Y轴下限设为0.1，这会导致0.03的数据看起来像是“悬空”或截断，需要特别注意
 
 # ---------------------- 3. 绘图设置 ----------------------
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 5.5), sharex=True)
 
 # ---------------------- 4. 绘制 deepseek 子图 ----------------------
 ax1.set_ylabel('deepseek-\nr1-0528', rotation=0, labelpad=20, ha='center', va='center', fontsize=13)
